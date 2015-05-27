@@ -32,9 +32,14 @@ PO::variables_map parseOptions(int argc, char * argv[]) {
         ("trg-tree", PO::value<string>(), "path to parses of target language")
         ("out-prob", PO::value<string>(), "path to output lexical probabilities")
         ;
+    // configuration
+    PO::options_description opt_config("Configurations");
+    opt_config.add_options()
+        ("unknown-threshold", PO::value<int>()->default_value(5), "maximum frequency to assume the word is unknown")
+        ;
     
     PO::options_description opt;
-    opt.add(opt_generic).add(opt_io);
+    opt.add(opt_generic).add(opt_io).add(opt_config);
 
     // parse
     PO::variables_map args;
@@ -62,8 +67,10 @@ PO::variables_map parseOptions(int argc, char * argv[]) {
 int main(int argc, char * argv[]) {
     auto args = parseOptions(argc, argv);
     
-    const string UNKNOWN_WORD = "()";
-    const int UNKNOWN_THRESHOLD = 2;
+    const string NULL_WORD = "(NULL)";
+    const string UNKNOWN_WORD = "(UNKNOWN)";
+
+    const int unknown_threshold = args["unknown-threshold"].as<int>();
 
     unique_ptr<ifstream> ifs_src_tree = Utility::openInputStream(args["src-tree"].as<string>());
     unique_ptr<ifstream> ifs_trg_tree = Utility::openInputStream(args["trg-tree"].as<string>());
@@ -73,15 +80,19 @@ int main(int argc, char * argv[]) {
     vector<Tree<int>> src_tree_list, trg_tree_list;
     vector<vector<int>> src_sentence_list, trg_sentence_list;
 
-    // add unknown identifier
+    // add nul/unknown identifier
+    src_word_dict.getId(NULL_WORD);
+    trg_word_dict.getId(NULL_WORD);
     src_word_dict.getId(UNKNOWN_WORD);
     trg_word_dict.getId(UNKNOWN_WORD);
+    const int NULL_ID = 0;
+    const int UNKNOWN_ID = 1;
 
     // load trees and extract words
+    cerr << "loading data ..." << endl;
+    
     string src, trg;
     int num_data = 0;
-
-    cerr << "loading data ..." << endl;
 
     while (getline(*ifs_src_tree, src) && getline(*ifs_trg_tree, trg)) {
         const auto src_tree = Utility::parseTree(src, src_tag_dict, src_word_dict);
@@ -102,16 +113,16 @@ int main(int argc, char * argv[]) {
     cerr << endl;
     cerr << "loaded " << num_data << " pairs" << endl;
 
-    cout << "recognized " << src_tag_dict.size() << " types of src grammar tags" << endl;
-    cout << "recognized " << trg_tag_dict.size() << " types of trg grammar tags" << endl;
-    cout << "recognized " << src_word_dict.size() << " types of src words" << endl;
-    cout << "recognized " << trg_word_dict.size() << " types of trg words" << endl;
+    cerr << "recognized " << src_tag_dict.size() << " types of src grammar tags" << endl;
+    cerr << "recognized " << trg_tag_dict.size() << " types of trg grammar tags" << endl;
+    cerr << "recognized " << src_word_dict.size() << " types of src words" << endl;
+    cerr << "recognized " << trg_word_dict.size() << " types of trg words" << endl;
 
     // count words and replace rare words with unknown word
+    cerr << "reduce vocabularies ..." << endl;
+
     vector<int> src_word_freq(src_word_dict.size(), 0);
     vector<int> trg_word_freq(trg_word_dict.size(), 0);
-
-    cerr << "shrink vocabularies ..." << endl;
 
     for (auto & src_sentence : src_sentence_list) {
         for (int w : src_sentence) {
@@ -124,20 +135,25 @@ int main(int argc, char * argv[]) {
         }
     }
 
-    vector<int> src_word_map(src_word_dict.size(), src_word_dict.getId(UNKNOWN_WORD));
-    vector<int> trg_word_map(trg_word_dict.size(), src_word_dict.getId(UNKNOWN_WORD));
+    vector<int> src_word_map(src_word_dict.size(), UNKNOWN_ID);
+    vector<int> trg_word_map(trg_word_dict.size(), UNKNOWN_ID);
+    src_word_map[NULL_ID] = NULL_ID;
+    trg_word_map[NULL_ID] = NULL_ID;
+    //src_word_map[UNKNOWN_ID] = UNKNOWN_ID;
+    //trg_word_map[UNKNOWN_ID] = UNKNOWN_ID;
 
-    {
-        int j = 0;
-        for (size_t i : boost::irange(static_cast<size_t>(1), src_word_dict.size())) {
-            if (src_word_freq[i] > UNKNOWN_THRESHOLD) src_word_map[i] = ++j;
-            cout << src_word_freq[i] << ' ' << src_word_map[i] << endl;
-        }
-        j = 0;
-        for (size_t i : boost::irange(static_cast<size_t>(1), trg_word_dict.size())) {
-            if (trg_word_freq[i] > UNKNOWN_THRESHOLD) trg_word_map[i] = ++j;
-        }
+    int src_num_reduced_words = 2;
+    for (size_t i : boost::irange(static_cast<size_t>(2), src_word_dict.size())) {
+        if (src_word_freq[i] > unknown_threshold) src_word_map[i] = src_num_reduced_words++;
     }
+
+    int trg_num_reduced_words = 2;
+    for (size_t i : boost::irange(static_cast<size_t>(2), trg_word_dict.size())) {
+        if (trg_word_freq[i] > unknown_threshold) trg_word_map[i] = trg_num_reduced_words++;
+    }
+
+    cerr << "size of src vocabulary to " << src_num_reduced_words << endl;
+    cerr << "size of trg vocabulary to " << trg_num_reduced_words << endl;
 
     return 0;
 }
