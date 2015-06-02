@@ -3,6 +3,7 @@ lib_LTLIBRARIES = libaligner.la
 AM_CXXFLAGS = -I$(srcdir)/../include $(BOOST_CPPFLAGS) -DPKGDATADIR='"$(pkgdatadir)"'
 
 libaligner_la_SOURCES = \
+    Aligner.cc \
     Dictionary.cc \
     utils.cc
 

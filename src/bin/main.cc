@@ -1,4 +1,5 @@
 #include <aligner/utils.h>
+#include <aligner/Aligner.h>
 #include <aligner/Dictionary.h>
 
 #include <boost/range/irange.hpp>
@@ -139,21 +140,40 @@ int main(int argc, char * argv[]) {
     vector<int> trg_word_map(trg_word_dict.size(), UNKNOWN_ID);
     src_word_map[NULL_ID] = NULL_ID;
     trg_word_map[NULL_ID] = NULL_ID;
-    //src_word_map[UNKNOWN_ID] = UNKNOWN_ID;
-    //trg_word_map[UNKNOWN_ID] = UNKNOWN_ID;
 
     int src_num_reduced_words = 2;
-    for (size_t i : boost::irange(static_cast<size_t>(2), src_word_dict.size())) {
+    for (size_t i : boost::irange(2UL, src_word_dict.size())) {
         if (src_word_freq[i] > unknown_threshold) src_word_map[i] = src_num_reduced_words++;
     }
 
     int trg_num_reduced_words = 2;
-    for (size_t i : boost::irange(static_cast<size_t>(2), trg_word_dict.size())) {
+    for (size_t i : boost::irange(2UL, trg_word_dict.size())) {
         if (trg_word_freq[i] > unknown_threshold) trg_word_map[i] = trg_num_reduced_words++;
     }
 
-    cerr << "size of src vocabulary to " << src_num_reduced_words << endl;
-    cerr << "size of trg vocabulary to " << trg_num_reduced_words << endl;
+    cerr << "the size of src vocabulary is reduced to " << src_num_reduced_words << endl;
+    cerr << "the size of trg vocabulary is reduced to " << trg_num_reduced_words << endl;
+
+    for (auto & sent : src_sentence_list) {
+        for (size_t i : boost::irange(0UL, sent.size())) {
+            sent[i] = src_word_map[sent[i]];
+        }
+    }
+    for (auto & sent : trg_sentence_list) {
+        for (size_t i : boost::irange(0UL, sent.size())) {
+            sent[i] = trg_word_map[sent[i]];
+        }
+    }
+    
+    for (int i : boost::irange(0, 10)) {
+        for (auto w : src_sentence_list[i]) cout << w << ' ';
+        cout << endl;
+    }
+
+    Aligner::Aligner::calculateIbmModel1(
+        src_sentence_list, trg_sentence_list,
+        src_num_reduced_words, trg_num_reduced_words,
+        100, NULL_ID);
 
     return 0;
 }
