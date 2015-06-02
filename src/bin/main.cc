@@ -39,6 +39,7 @@ PO::variables_map parseOptions(int argc, char * argv[]) {
     // configuration
     PO::options_description opt_config("Configurations");
     opt_config.add_options()
+        ("model1-iteration", PO::value<int>()->default_value(10), "Number of iterations for IBM model 1 calculation")
         ("unknown-threshold", PO::value<int>()->default_value(5), "maximum frequency to assume the word is unknown")
         ;
     
@@ -168,7 +169,7 @@ int main(int argc, char * argv[]) {
         }
     }
     
-    auto translation_prob = Aligner::Aligner::calculateIbmModel1(src_sentence_list, trg_sentence_list, src_num_reduced_words, trg_num_reduced_words, 500, NULL_ID);
+    auto translation_prob = Aligner::Aligner::calculateIbmModel1(src_sentence_list, trg_sentence_list, src_num_reduced_words, trg_num_reduced_words, args["model1-iteration"].as<int>(), NULL_ID);
 
     return 0;
 }
