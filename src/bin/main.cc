@@ -188,10 +188,9 @@ int main(int argc, char * argv[]) {
     cerr << "the size of src vocabulary is reduced to " << src_num_reduced_words << endl;
     cerr << "the size of trg vocabulary is reduced to " << trg_num_reduced_words << endl;
 
-    cerr << src_tree_list[0] << endl;
-    for (auto w : src_sentence_list[0]) cerr << w << ' '; cerr << endl;
+    auto model1_translation_prob = Aligner::Aligner::calculateIbmModel1(src_sentence_list, trg_sentence_list, src_num_reduced_words, trg_num_reduced_words, args["model1-iteration"].as<int>(), NULL_ID);
 
-    auto translation_prob = Aligner::Aligner::calculateIbmModel1(src_sentence_list, trg_sentence_list, src_num_reduced_words, trg_num_reduced_words, args["model1-iteration"].as<int>(), NULL_ID);
+
 
     return 0;
 }

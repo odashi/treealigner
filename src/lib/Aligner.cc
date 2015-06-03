@@ -28,7 +28,7 @@ vector<vector<double>> Aligner::calculateIbmModel1(
     if (src_corpus.size() != trg_corpus.size()) throw runtime_error("Aligner::calculateIbmModel1: sizes of src/trg are different.");
     if (src_num_vocab <= 0) throw runtime_error("Aligner::calculateIbmModel1: src_num_vocab must be greater than 0.");
     if (trg_num_vocab <= 0) throw runtime_error("Aligner::calculateIbmModel1: trg_num_vocab must be greater than 0.");
-    if (num_iteration <= 0) throw runtime_error("Aligner::calculateIbmModel1: num_iteration must be greater than 0.");
+    if (num_iteration < 0) throw runtime_error("Aligner::calculateIbmModel1: num_iteration must be greater than -1.");
 
     int num_sentences = src_corpus.size();
 
