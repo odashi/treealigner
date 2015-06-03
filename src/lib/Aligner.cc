@@ -88,7 +88,7 @@ vector<vector<double>> Aligner::calculateIbmModel1(
                 double delta = pt[t][src_null_id] / sumpt[t];
                 c[t][src_null_id] += delta;
                 sumc[src_null_id] += delta;
-            }            
+            }
         }
 
         // calculate pt[t][s]

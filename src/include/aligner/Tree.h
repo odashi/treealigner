@@ -39,11 +39,15 @@ public:
     inline T label() const { return label_; }
     inline size_t size() const { return children_.size(); }
 
+    inline typename std::vector<Tree<T>>::iterator begin() { return children_.begin(); }
     inline typename std::vector<Tree<T>>::const_iterator begin() const { return children_.begin(); }
+    inline typename std::vector<Tree<T>>::iterator end() { return children_.end(); }
     inline typename std::vector<Tree<T>>::const_iterator end() const { return children_.end(); }
 
     inline void add(const Tree<T> & child) { children_.push_back(child); }
     inline void add(Tree<T> && child) { children_.push_back(std::move(child)); }
+
+    inline void setLabel(const T & value) { label_ = value; }
 
 private:
     T label_;

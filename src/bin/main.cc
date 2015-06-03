@@ -7,6 +7,7 @@
 #include <boost/program_options.hpp>
 
 #include <cmath>
+#include <functional>
 #include <iostream>
 
 using namespace std;
@@ -100,10 +101,10 @@ int main(int argc, char * argv[]) {
     int num_data = 0;
 
     while (getline(*ifs_src_tree, src) && getline(*ifs_trg_tree, trg)) {
-        const auto src_tree = Utility::parseTree(src, src_tag_dict, src_word_dict);
-        const auto trg_tree = Utility::parseTree(trg, trg_tag_dict, trg_word_dict);
-        const auto src_sentence = Utility::extractWords(src_tree);
-        const auto trg_sentence = Utility::extractWords(trg_tree);
+        auto src_tree = Utility::parseTree(src, src_tag_dict, src_word_dict);
+        auto trg_tree = Utility::parseTree(trg, trg_tag_dict, trg_word_dict);
+        auto src_sentence = Utility::extractWords(src_tree);
+        auto trg_sentence = Utility::extractWords(trg_tree);
 
         src_tree_list.push_back(std::move(src_tree));
         trg_tree_list.push_back(std::move(trg_tree));
@@ -155,9 +156,6 @@ int main(int argc, char * argv[]) {
         if (trg_word_freq[i] > unknown_threshold) trg_word_map[i] = trg_num_reduced_words++;
     }
 
-    cerr << "the size of src vocabulary is reduced to " << src_num_reduced_words << endl;
-    cerr << "the size of trg vocabulary is reduced to " << trg_num_reduced_words << endl;
-
     for (auto & sent : src_sentence_list) {
         for (size_t i : irange(0UL, sent.size())) {
             sent[i] = src_word_map[sent[i]];
@@ -168,7 +166,31 @@ int main(int argc, char * argv[]) {
             sent[i] = trg_word_map[sent[i]];
         }
     }
+
+    function<void(Tree<int> &, const vector<int> &)> replaceLeaves
+        = [&replaceLeaves](Tree<int> & node, const vector<int> & mapping) -> void {
+        if (!node.size()) {
+            node.setLabel(mapping[node.label()]);
+        } else {
+            for (auto & ch : node) {
+                replaceLeaves(ch, mapping);
+            }
+        }
+    };
+
+    for (auto & tree : src_tree_list) {
+        replaceLeaves(tree, src_word_map);
+    }
+    for (auto & tree : trg_tree_list) {
+        replaceLeaves(tree, trg_word_map);
+    }
     
+    cerr << "the size of src vocabulary is reduced to " << src_num_reduced_words << endl;
+    cerr << "the size of trg vocabulary is reduced to " << trg_num_reduced_words << endl;
+
+    cerr << src_tree_list[0] << endl;
+    for (auto w : src_sentence_list[0]) cerr << w << ' '; cerr << endl;
+
     auto translation_prob = Aligner::Aligner::calculateIbmModel1(src_sentence_list, trg_sentence_list, src_num_reduced_words, trg_num_reduced_words, args["model1-iteration"].as<int>(), NULL_ID);
 
     return 0;
