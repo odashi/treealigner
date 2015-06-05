@@ -16,7 +16,7 @@ using boost::irange;
 
 namespace Aligner {
 
-vector<vector<double>> Aligner::calculateIbmModel1(
+vector<vector<double>> Aligner::trainIbmModel1(
     const vector<vector<int>> & src_corpus,
     const vector<vector<int>> & trg_corpus,
     int src_num_vocab,
@@ -24,7 +24,7 @@ vector<vector<double>> Aligner::calculateIbmModel1(
     int num_iteration,
     int src_null_id) {
 
-    cerr << "Calculating IBM Model 1 ..." << endl;
+    cerr << "Training IBM Model 1 ..." << endl;
 
     // check constraints
     MYASSERT(Aligner::calculateIbmModel1, src_corpus.size() == trg_corpus.size());
@@ -108,7 +108,7 @@ vector<vector<double>> Aligner::calculateIbmModel1(
     return pt;
 }
 
-void Aligner::calculateHmmModel(
+void Aligner::trainHmmModel(
     const vector<vector<int>> & src_corpus,
     const vector<vector<int>> & trg_corpus,
     const vector<vector<double>> & prior_translation_prob,
@@ -118,7 +118,7 @@ void Aligner::calculateHmmModel(
     int src_null_id,
     int distance_limit) {
 
-    cerr << "Calculating HMM model ..." << endl;
+    cerr << "Training HMM model ..." << endl;
 
     // check constraints
     MYASSERT(Aligner::calculateHmmModel, src_corpus.size() == trg_corpus.size());
@@ -286,12 +286,6 @@ void Aligner::calculateHmmModel(
             }
         }
 
-        /*
-        for (int i : irange(-distance_limit, distance_limit + 1)) {
-            cerr << (format("%d: %f") % i % cj[i + distance_limit]) << endl;
-        }
-        */
-
         // set new jumping factors
         fj = cj;
 
@@ -302,7 +296,7 @@ void Aligner::calculateHmmModel(
             }
         }
 
-        cerr << (format("    H = %.20e") % entropy) << endl;
+        cerr << (format("    H = %.10e") % entropy) << endl;
     }
 }
 

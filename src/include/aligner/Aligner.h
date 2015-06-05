@@ -12,7 +12,7 @@ class Aligner {
 
 public:
     
-    static std::vector<std::vector<double>> calculateIbmModel1(
+    static std::vector<std::vector<double>> trainIbmModel1(
         const std::vector<std::vector<int>> & src_corpus,
         const std::vector<std::vector<int>> & trg_corpus,
         int src_num_vocab,
@@ -20,7 +20,7 @@ public:
         int num_iteration,
         int src_null_id);
 
-    static void calculateHmmModel(
+    static void trainHmmModel(
         const std::vector<std::vector<int>> & src_corpus,
         const std::vector<std::vector<int>> & trg_corpus,
         const std::vector<std::vector<double>> & prior_translation_prob,
