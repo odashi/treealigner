@@ -40,8 +40,10 @@ PO::variables_map parseOptions(int argc, char * argv[]) {
     // configuration
     PO::options_description opt_config("Configurations");
     opt_config.add_options()
-        ("model1-iteration", PO::value<int>()->default_value(10), "Number of iterations for IBM model 1 calculation")
         ("unknown-threshold", PO::value<int>()->default_value(5), "maximum frequency to assume the word is unknown")
+        ("model1-iteration", PO::value<int>()->default_value(10), "number of iterations for IBM model 1 training")
+        ("hmm-iteration", PO::value<int>()->default_value(10), "number of iterations for HMM model training")
+        ("hmm-distance-limit", PO::value<int>()->default_value(10), "maximum distance to connect HMM nodes")
         ;
     
     PO::options_description opt;
@@ -188,9 +190,23 @@ int main(int argc, char * argv[]) {
     cerr << "the size of src vocabulary is reduced to " << src_num_reduced_words << endl;
     cerr << "the size of trg vocabulary is reduced to " << trg_num_reduced_words << endl;
 
-    auto model1_translation_prob = Aligner::Aligner::trainIbmModel1(src_sentence_list, trg_sentence_list, src_num_reduced_words, trg_num_reduced_words, args["model1-iteration"].as<int>(), NULL_ID);
+    auto model1_translation_prob = Aligner::Aligner::trainIbmModel1(
+        src_sentence_list,
+        trg_sentence_list,
+        src_num_reduced_words,
+        trg_num_reduced_words,
+        args["model1-iteration"].as<int>(),
+        NULL_ID);
 
-    Aligner::Aligner::trainHmmModel(src_sentence_list, trg_sentence_list, model1_translation_prob, src_num_reduced_words, trg_num_reduced_words, 20000, NULL_ID, 10);
+    Aligner::Aligner::trainHmmModel(
+        src_sentence_list,
+        trg_sentence_list,
+        model1_translation_prob,
+        src_num_reduced_words,
+        trg_num_reduced_words,
+        args["hmm-iteration"].as<int>(),
+        NULL_ID,
+        args["hmm-distance-limit"].as<int>());
 
     return 0;
 }
