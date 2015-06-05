@@ -20,6 +20,16 @@ public:
         int num_iteration,
         int src_null_id);
 
+    static void calculateHmmModel(
+        const std::vector<std::vector<int>> & src_corpus,
+        const std::vector<std::vector<int>> & trg_corpus,
+        const std::vector<std::vector<double>> & prior_translation_prob,
+        int src_num_vocab,
+        int trg_num_vocab,
+        int num_iteration,
+        int src_null_id,
+        int distance_limit);
+
 }; // class Aligner
 
 } // namespace Aligner

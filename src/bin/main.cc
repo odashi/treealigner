@@ -190,7 +190,7 @@ int main(int argc, char * argv[]) {
 
     auto model1_translation_prob = Aligner::Aligner::calculateIbmModel1(src_sentence_list, trg_sentence_list, src_num_reduced_words, trg_num_reduced_words, args["model1-iteration"].as<int>(), NULL_ID);
 
-
+    Aligner::Aligner::calculateHmmModel(src_sentence_list, trg_sentence_list, model1_translation_prob, src_num_reduced_words, trg_num_reduced_words, 20000, NULL_ID, 10);
 
     return 0;
 }
