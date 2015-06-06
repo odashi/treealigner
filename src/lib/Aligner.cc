@@ -51,8 +51,7 @@ vector<vector<double>> Aligner::trainIbmModel1(
         // sumc[s] = sum_t count(t|s)
         vector<double> sumc(src_num_vocab, 0.0);
 
-        // previous entropy
-        double entropy = 0.0;
+        double log_likelihood = 0.0;
 
         for (int k : irange(0, num_sentences)) {
             auto & src_sentence = src_corpus[k];
@@ -62,8 +61,7 @@ vector<vector<double>> Aligner::trainIbmModel1(
             // sumpt[t] = sum_s Pt(t|s)
             vector<double> sumpt(trg_num_vocab, 0.0);
 
-            // previous perplexity of the text
-            double ppl = 0.0;
+            double likelihood = 0.0;
 
             //calculate sumpt[t] and ppl
             for (int t : trg_sentence) {
@@ -71,15 +69,15 @@ vector<vector<double>> Aligner::trainIbmModel1(
                 for (int s : src_sentence) {
                     double delta = pt[t][s];
                     sumpt[t] += delta;
-                    ppl += delta;
+                    likelihood += delta;
                 }
                 // null word
                 double delta = pt[t][src_null_id];
                 sumpt[t] += delta;
-                ppl += delta;
+                likelihood += delta;
             }
 
-            entropy -= log(ppl) - trg_sentence.size() * log(src_sentence.size());
+            log_likelihood -= log(likelihood) - trg_sentence.size() * log(src_sentence.size());
 
             // calculate c[t][s] and sumc[s]
             for (int t : trg_sentence) {
@@ -103,7 +101,7 @@ vector<vector<double>> Aligner::trainIbmModel1(
             }
         }
 
-        Tracer::println(2, format("H = %.10e") % entropy);
+        Tracer::println(2, format("LL = %.10e") % log_likelihood);
     }
 
     return pt;
@@ -152,8 +150,7 @@ void Aligner::trainHmmModel(
         // cj[d + distance_limit] = count(d)
         vector<double> cj(2 * distance_limit + 1, 0.0);
 
-        // entropy
-        double entropy = 0.0;
+        double log_likelihood = 0.0;
 
         for (int k : irange(0, num_sentences)) {
             auto & src_sentence = src_corpus.at(k);
@@ -219,9 +216,9 @@ void Aligner::trainHmmModel(
                 }
             }
 
-            // calculate entropy
+            // calculate log likelihood
             for (int it : irange(0, trg_len)) {
-                entropy += log(scale[it]);
+                log_likelihood += log(scale[it]);
             }
             
             // beta (backward) scaled prob.
@@ -297,7 +294,7 @@ void Aligner::trainHmmModel(
             }
         }
 
-        Tracer::println(2, format("H = %.10e") % entropy);
+        Tracer::println(2, format("LL = %.10e") % log_likelihood);
     }
 }
 
