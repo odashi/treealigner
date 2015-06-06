@@ -1,6 +1,8 @@
-#include <aligner/utils.h>
 #include <aligner/Aligner.h>
 #include <aligner/Dictionary.h>
+#include <aligner/Tracer.h>
+#include <aligner/assertion.h>
+#include <aligner/utils.h>
 
 #include <boost/format.hpp>
 #include <boost/range/irange.hpp>
@@ -25,6 +27,7 @@ PO::variables_map parseOptions(int argc, char * argv[]) {
     PO::options_description opt_generic("Generic Options");
     opt_generic.add_options()
         ("help", "print this manual and exit")
+        ("trace-level", PO::value<int>()->default_value(0), "tracing detail")
         ;
     // input/output
     PO::options_description opt_io("I/O Options");
@@ -72,9 +75,18 @@ PO::variables_map parseOptions(int argc, char * argv[]) {
     return move(args);
 }
 
+// initialize tracer settings
+void initializeTracer(const PO::variables_map & args) {
+    int level = args["trace-level"].as<int>();
+    MYASSERT(::initializeTracer, level >= 0);
+    Tracer::setTraceLevel(level);
+}
+
 int main(int argc, char * argv[]) {
     auto args = parseOptions(argc, argv);
-    
+
+    initializeTracer(args);
+
     const string NULL_WORD = "(NULL)";
     const string UNKNOWN_WORD = "(UNKNOWN)";
 
@@ -97,7 +109,7 @@ int main(int argc, char * argv[]) {
     const int UNKNOWN_ID = 1;
 
     // load trees and extract words
-    cerr << "loading data ..." << endl;
+    Tracer::println(0, "Loading data ..");
     
     string src, trg;
     int num_data = 0;
@@ -114,20 +126,19 @@ int main(int argc, char * argv[]) {
         trg_sentence_list.push_back(std::move(trg_sentence));
 
         ++num_data;
-        if (num_data % 100000 == 0) cerr << num_data << endl;
-        else if (num_data % 10000 == 0) cerr << '.';
+        if (num_data % 100000 == 0) {
+            Tracer::println(1, format("%d sentences loaded") % num_data);
+        }
     }
     
-    cerr << endl;
-    cerr << "loaded " << num_data << " pairs" << endl;
-
-    cerr << "recognized " << src_tag_dict.size() << " types of src grammar tags" << endl;
-    cerr << "recognized " << trg_tag_dict.size() << " types of trg grammar tags" << endl;
-    cerr << "recognized " << src_word_dict.size() << " types of src words" << endl;
-    cerr << "recognized " << trg_word_dict.size() << " types of trg words" << endl;
+    Tracer::println(1, format("%d sentences loaded") % num_data);
+    Tracer::println(1, format("#src grammar tags: %d") % src_tag_dict.size());
+    Tracer::println(1, format("#trg grammar tags: %d") % trg_tag_dict.size());
+    Tracer::println(1, format("#src vocaburaly: %d") % src_word_dict.size());
+    Tracer::println(1, format("#trg vocaburaly: %d") % trg_word_dict.size());
 
     // count words and replace rare words with unknown word
-    cerr << "reduce vocabularies ..." << endl;
+    Tracer::println(0, "Reducing vocabularies ...");
 
     vector<int> src_word_freq(src_word_dict.size(), 0);
     vector<int> trg_word_freq(trg_word_dict.size(), 0);
@@ -187,16 +198,16 @@ int main(int argc, char * argv[]) {
         replaceLeaves(tree, trg_word_map);
     }
     
-    cerr << "the size of src vocabulary is reduced to " << src_num_reduced_words << endl;
-    cerr << "the size of trg vocabulary is reduced to " << trg_num_reduced_words << endl;
+    Tracer::println(1, format("#src reduced vocaburaly: %d") % src_num_reduced_words);
+    Tracer::println(1, format("#trg reduced vocaburaly: %d") % trg_num_reduced_words);
 
     auto model1_translation_prob = Aligner::Aligner::trainIbmModel1(
         src_sentence_list,
         trg_sentence_list,
         src_num_reduced_words,
         trg_num_reduced_words,
-        args["model1-iteration"].as<int>(),
-        NULL_ID);
+        NULL_ID,
+        args["model1-iteration"].as<int>());
 
     Aligner::Aligner::trainHmmModel(
         src_sentence_list,
@@ -204,8 +215,8 @@ int main(int argc, char * argv[]) {
         model1_translation_prob,
         src_num_reduced_words,
         trg_num_reduced_words,
-        args["hmm-iteration"].as<int>(),
         NULL_ID,
+        args["hmm-iteration"].as<int>(),
         args["hmm-distance-limit"].as<int>());
 
     return 0;

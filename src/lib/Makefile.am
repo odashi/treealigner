@@ -5,6 +5,7 @@ AM_CXXFLAGS = -I$(srcdir)/../include $(BOOST_CPPFLAGS) -DPKGDATADIR='"$(pkgdatad
 libaligner_la_SOURCES = \
     Aligner.cc \
     Dictionary.cc \
+    Tracer.cc \
     utils.cc
 
 libaligner_la_LDFLAGS = -version-info 0:1:0 $(BOOST_LDFLAGS) $(BOOST_IOSTREAMS_LIB)

@@ -17,8 +17,8 @@ public:
         const std::vector<std::vector<int>> & trg_corpus,
         int src_num_vocab,
         int trg_num_vocab,
-        int num_iteration,
-        int src_null_id);
+        int src_null_id,
+        int num_iteration);
 
     static void trainHmmModel(
         const std::vector<std::vector<int>> & src_corpus,
@@ -26,8 +26,8 @@ public:
         const std::vector<std::vector<double>> & prior_translation_prob,
         int src_num_vocab,
         int trg_num_vocab,
-        int num_iteration,
         int src_null_id,
+        int num_iteration,
         int distance_limit);
 
 }; // class Aligner

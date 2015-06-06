@@ -1,4 +1,5 @@
 #include <aligner/Aligner.h>
+#include <aligner/Tracer.h>
 #include <aligner/assertion.h>
 
 #include <boost/format.hpp>
@@ -21,10 +22,10 @@ vector<vector<double>> Aligner::trainIbmModel1(
     const vector<vector<int>> & trg_corpus,
     int src_num_vocab,
     int trg_num_vocab,
-    int num_iteration,
-    int src_null_id) {
+    int src_null_id,
+    int num_iteration) {
 
-    cerr << "Training IBM Model 1 ..." << endl;
+    Tracer::println(0, "Training IBM model 1 ...");
 
     // check constraints
     MYASSERT(Aligner::calculateIbmModel1, src_corpus.size() == trg_corpus.size());
@@ -42,7 +43,7 @@ vector<vector<double>> Aligner::trainIbmModel1(
     
     for (int iteration : irange(0, num_iteration)) {
 
-        cerr << "  Iteration " << (iteration + 1) << endl;
+        Tracer::println(1, format("Iteration %d") % (iteration + 1));
         
         // probabilistic counts
         // c[t][s] = count(t|s)
@@ -102,7 +103,7 @@ vector<vector<double>> Aligner::trainIbmModel1(
             }
         }
 
-        cerr << (format("    H = %.10e") % entropy) << endl;
+        Tracer::println(2, format("H = %.10e") % entropy);
     }
 
     return pt;
@@ -114,11 +115,11 @@ void Aligner::trainHmmModel(
     const vector<vector<double>> & prior_translation_prob,
     int src_num_vocab,
     int trg_num_vocab,
-    int num_iteration,
     int src_null_id,
+    int num_iteration,
     int distance_limit) {
 
-    cerr << "Training HMM model ..." << endl;
+    Tracer::println(0, "Training HMM model ...");
 
     // check constraints
     MYASSERT(Aligner::calculateHmmModel, src_corpus.size() == trg_corpus.size());
@@ -141,7 +142,7 @@ void Aligner::trainHmmModel(
 
     for (int iteration : irange(0, num_iteration)) {
         
-        cerr << "  Iteration " << (iteration + 1) << endl;
+        Tracer::println(1, format("Iteration %d") % (iteration + 1));
 
         // probabilistic counts
         // ct[t][s] = count(t|s)
@@ -296,7 +297,7 @@ void Aligner::trainHmmModel(
             }
         }
 
-        cerr << (format("    H = %.10e") % entropy) << endl;
+        Tracer::println(2, format("H = %.10e") % entropy);
     }
 }
 
