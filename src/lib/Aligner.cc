@@ -77,7 +77,7 @@ vector<vector<double>> Aligner::trainIbmModel1(
                 likelihood += delta;
             }
 
-            log_likelihood -= log(likelihood) - trg_sentence.size() * log(src_sentence.size());
+            log_likelihood += log(likelihood) - trg_sentence.size() * log(src_sentence.size());
 
             // calculate c[t][s] and sumc[s]
             for (int t : trg_sentence) {
@@ -233,7 +233,7 @@ void Aligner::trainHmmModel(
 
             // calculate log likelihood
             for (int it : irange(0, trg_len)) {
-                log_likelihood += log(scale[it]);
+                log_likelihood -= log(scale[it]);
             }
             
             // beta (backward) scaled prob.
@@ -333,7 +333,7 @@ void Aligner::trainHmmModel(
             }
         }
 
-        Tracer::println(2, format("LL = %.20e") % log_likelihood);
+        Tracer::println(2, format("LL = %.10e") % log_likelihood);
     }
 }
 
