@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <utility>
 #include <vector>
 
 using namespace std;
@@ -107,7 +108,7 @@ vector<vector<double>> Aligner::trainIbmModel1(
     return pt;
 }
 
-void Aligner::trainHmmModel(
+HmmModel Aligner::trainHmmModel(
     const vector<vector<int>> & src_corpus,
     const vector<vector<int>> & trg_corpus,
     const vector<vector<double>> & prior_translation_prob,
@@ -332,6 +333,7 @@ void Aligner::trainHmmModel(
 
         // set new jumping factors
         fj = cj;
+        fj_null = cj_null;
 
         // calculate pt[t][s]
         for (int t : irange(0, trg_num_vocab)) {
@@ -343,6 +345,8 @@ void Aligner::trainHmmModel(
 
         Tracer::println(2, format("LL = %.10e") % log_likelihood);
     }
+
+    return HmmModel { std::move(pt), std::move(fj), fj_null };
 }
 
 } // namespace TreeAligner

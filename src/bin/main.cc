@@ -209,7 +209,7 @@ int main(int argc, char * argv[]) {
         NULL_ID,
         args["model1-iteration"].as<int>());
 
-    Aligner::trainHmmModel(
+    auto hmm_model = Aligner::trainHmmModel(
         src_sentence_list,
         trg_sentence_list,
         model1_translation_prob,
