@@ -78,7 +78,7 @@ vector<vector<double>> Aligner::trainIbmModel1(
                 likelihood += delta;
             }
 
-            log_likelihood += log(likelihood) - trg_sentence.size() * log(src_sentence.size());
+            log_likelihood += log(likelihood) - trg_sentence.size() * log(src_sentence.size() + 1);
 
             // calculate c[t][s] and sumc[s]
             for (int t : trg_sentence) {
@@ -98,7 +98,7 @@ vector<vector<double>> Aligner::trainIbmModel1(
         // calculate pt[t][s]
         for (int t : irange(0, trg_num_vocab)) {
             for (int s : irange(0, src_num_vocab)) {
-                pt[t][s] = c[t][s] / sumc[s];
+                pt[t][s] = (sumc[s] > 0.0) ? c[t][s] / sumc[s] : 0.0;
             }
         }
 
@@ -338,8 +338,7 @@ HmmModel Aligner::trainHmmModel(
         // calculate pt[t][s]
         for (int t : irange(0, trg_num_vocab)) {
             for (int s : irange(0, src_num_vocab)) {
-                if (sumct[s] == 0.0) throw runtime_error("asdf!~!!");
-                pt[t][s] = ct[t][s] / sumct[s];
+                pt[t][s] = (sumct[s] > 0.0) ? ct[t][s] / sumct[s] : 0.0;
             }
         }
 
