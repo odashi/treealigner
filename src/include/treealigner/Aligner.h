@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <utility>
 
 namespace TreeAligner {
 
@@ -35,6 +36,12 @@ public:
         int src_null_id,
         int num_iteration,
         int distance_limit);
+
+    static std::vector<std::pair<int, int>> makeIbmModel1ViterbiAlignment(
+        const std::vector<int> & src_sentence,
+        const std::vector<int> & trg_sentence,
+        const std::vector<std::vector<double>> & translation_prob,
+        int src_null_id);
 
 }; // class Aligner
 

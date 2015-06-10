@@ -348,5 +348,34 @@ HmmModel Aligner::trainHmmModel(
     return HmmModel { std::move(pt), std::move(fj), fj_null };
 }
 
+vector<pair<int, int>> Aligner::makeIbmModel1ViterbiAlignment(
+    const vector<int> & src_sentence,
+    const vector<int> & trg_sentence,
+    const vector<vector<double>> & translation_prob,
+    int src_null_id) {
+    
+    vector<pair<int, int>> align;
+    int src_len = src_sentence.size();
+    int trg_len = trg_sentence.size();
+
+    for (int it : irange(0, trg_len)) {
+        int t = trg_sentence[it];
+        int max_is = -1;
+        double max_prob = -1.0;
+        for (int is : irange(0, src_len)) {
+            double prob = translation_prob[t][src_sentence[is]];
+            if (prob > max_prob) {
+                max_is = is;
+                max_prob = prob;
+            }
+        }
+        if (max_prob > translation_prob[t][src_null_id]) {
+            align.push_back(pair<int, int>(max_is, it));
+        }
+    }
+
+    return align;
+}
+
 } // namespace TreeAligner
 
