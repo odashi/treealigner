@@ -37,7 +37,7 @@ public:
         int num_iteration,
         int distance_limit);
 
-    static std::vector<std::pair<int, int>> makeIbmModel1ViterbiAlignment(
+    static std::vector<std::pair<int, int>> generateIbmModel1ViterbiAlignment(
         const std::vector<int> & src_sentence,
         const std::vector<int> & trg_sentence,
         const std::vector<std::vector<double>> & translation_prob,

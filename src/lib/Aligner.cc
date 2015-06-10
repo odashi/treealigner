@@ -348,7 +348,7 @@ HmmModel Aligner::trainHmmModel(
     return HmmModel { std::move(pt), std::move(fj), fj_null };
 }
 
-vector<pair<int, int>> Aligner::makeIbmModel1ViterbiAlignment(
+vector<pair<int, int>> Aligner::generateIbmModel1ViterbiAlignment(
     const vector<int> & src_sentence,
     const vector<int> & trg_sentence,
     const vector<vector<double>> & translation_prob,
