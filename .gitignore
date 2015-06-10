@@ -18,5 +18,5 @@ stamp-h1
 *.la
 *.lo
 *.o
-src/bin/aligner
+src/bin/treealigner
 

@@ -1,6 +1,6 @@
-#include <aligner/Aligner.h>
-#include <aligner/Tracer.h>
-#include <aligner/assertion.h>
+#include <treealigner/Aligner.h>
+#include <treealigner/Tracer.h>
+#include <treealigner/assertion.h>
 
 #include <boost/format.hpp>
 #include <boost/range/adaptor/reversed.hpp>
@@ -15,7 +15,7 @@ using boost::adaptors::reversed;
 using boost::format;
 using boost::irange;
 
-namespace Aligner {
+namespace TreeAligner {
 
 vector<vector<double>> Aligner::trainIbmModel1(
     const vector<vector<int>> & src_corpus,
@@ -28,12 +28,12 @@ vector<vector<double>> Aligner::trainIbmModel1(
     Tracer::println(0, "Training IBM model 1 ...");
 
     // check constraints
-    MYASSERT(Aligner::calculateIbmModel1, src_corpus.size() == trg_corpus.size());
-    MYASSERT(Aligner::calculateIbmModel1, src_num_vocab > 0);
-    MYASSERT(Aligner::calculateIbmModel1, trg_num_vocab > 0);
-    MYASSERT(Aligner::calculateIbmModel1, num_iteration >= 0);
-    MYASSERT(Aligner::calculateIbmModel1, src_null_id >= 0);
-    MYASSERT(Aligner::calculateIbmModel1, src_null_id < src_num_vocab);
+    MYASSERT(TreeAligner::Aligner::calculateIbmModel1, src_corpus.size() == trg_corpus.size());
+    MYASSERT(TreeAligner::Aligner::calculateIbmModel1, src_num_vocab > 0);
+    MYASSERT(TreeAligner::Aligner::calculateIbmModel1, trg_num_vocab > 0);
+    MYASSERT(TreeAligner::Aligner::calculateIbmModel1, num_iteration >= 0);
+    MYASSERT(TreeAligner::Aligner::calculateIbmModel1, src_null_id >= 0);
+    MYASSERT(TreeAligner::Aligner::calculateIbmModel1, src_null_id < src_num_vocab);
 
     int num_sentences = src_corpus.size();
 
@@ -120,13 +120,13 @@ void Aligner::trainHmmModel(
     Tracer::println(0, "Training HMM model ...");
 
     // check constraints
-    MYASSERT(Aligner::calculateHmmModel, src_corpus.size() == trg_corpus.size());
-    MYASSERT(Aligner::calculateHmmModel, src_num_vocab > 0);
-    MYASSERT(Aligner::calculateHmmModel, trg_num_vocab > 0);
-    MYASSERT(Aligner::calculateHmmModel, num_iteration >= 0);
-    MYASSERT(Aligner::calculateHmmModel, src_null_id >= 0);
-    MYASSERT(Aligner::calculateHmmModel, src_null_id < src_num_vocab);
-    MYASSERT(Aligner::calculateHmmModel, distance_limit >= 0);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_corpus.size() == trg_corpus.size());
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_num_vocab > 0);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, trg_num_vocab > 0);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, num_iteration >= 0);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_null_id >= 0);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_null_id < src_num_vocab);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, distance_limit >= 0);
 
     int num_sentences = src_corpus.size();
 
@@ -337,5 +337,5 @@ void Aligner::trainHmmModel(
     }
 }
 
-} // namespace Aligner
+} // namespace TreeAligner
 

@@ -6,7 +6,7 @@
 #include <vector>
 #include <iostream>
 
-namespace Aligner {
+namespace TreeAligner {
 
 template <class T>
 class Tree {
@@ -67,5 +67,5 @@ std::ostream & operator<<(std::ostream & os, const Tree<T> & tree) {
     return os;
 }
 
-} // namespace Aligner
+} // namespace TreeAligner
 

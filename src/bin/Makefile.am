@@ -1,7 +1,7 @@
 AM_CXXFLAGS = -I$(srcdir)/../include $(BOOST_CPPFLAGS)
-LDADD = ../lib/libaligner.la $(BOOST_LDFLAGS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_PROGRAM_OPTIONS_LIB)
+LDADD = ../lib/libtreealigner.la $(BOOST_LDFLAGS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_PROGRAM_OPTIONS_LIB)
 
-bin_PROGRAMS = aligner
+bin_PROGRAMS = treealigner
 
-aligner_SOURCES = main.cc
-aligner_LDADD = $(LDADD)
+treealigner_SOURCES = main.cc
+treealigner_LDADD = $(LDADD)

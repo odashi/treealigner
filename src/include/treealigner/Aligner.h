@@ -2,7 +2,7 @@
 
 #include <vector>
 
-namespace Aligner {
+namespace TreeAligner {
 
 class Aligner {
 
@@ -32,5 +32,5 @@ public:
 
 }; // class Aligner
 
-} // namespace Aligner
+} // namespace TreeAligner
 

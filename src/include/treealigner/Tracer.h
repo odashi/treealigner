@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace Aligner {
+namespace TreeAligner {
 
 class Tracer {
 
@@ -23,5 +23,5 @@ private:
 
 }; // class Tracer
 
-} // namespace Aligner
+} // namespace TreeAligner
 

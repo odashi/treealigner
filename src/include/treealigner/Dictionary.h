@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace Aligner {
+namespace TreeAligner {
 
 class Dictionary {
 
@@ -30,5 +30,5 @@ private:
 
 }; // class Dictionary
 
-} // namespace Aligner
+} // namespace TreeAligner
 

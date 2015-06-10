@@ -1,4 +1,4 @@
-#include <aligner/utils.h>
+#include <treealigner/Utility.h>
 
 #include <boost/algorithm/string.hpp>
 
@@ -9,7 +9,7 @@
 
 using namespace std;
 
-namespace Aligner {
+namespace TreeAligner {
 
 namespace {
 
@@ -96,5 +96,5 @@ vector<int> Utility::extractWords(const Tree<int> & tree) {
     return result;
 }
 
-} // namespace Aligner
+} // namespace TreeAligner
 

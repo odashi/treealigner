@@ -1,8 +1,8 @@
-#include <aligner/Aligner.h>
-#include <aligner/Dictionary.h>
-#include <aligner/Tracer.h>
-#include <aligner/assertion.h>
-#include <aligner/utils.h>
+#include <treealigner/assertion.h>
+#include <treealigner/Aligner.h>
+#include <treealigner/Dictionary.h>
+#include <treealigner/Tracer.h>
+#include <treealigner/Utility.h>
 
 #include <boost/format.hpp>
 #include <boost/range/irange.hpp>
@@ -13,14 +13,14 @@
 #include <iostream>
 
 using namespace std;
-using namespace Aligner;
+using namespace TreeAligner;
 using boost::format;
 using boost::irange;
 
 namespace PO = boost::program_options;
 
 PO::variables_map parseOptions(int argc, char * argv[]) {
-    string description = "AHC Aligner";
+    string description = "AHC TreeAligner";
     string binname = "aligner";
 
     // generic options
@@ -201,7 +201,7 @@ int main(int argc, char * argv[]) {
     Tracer::println(1, format("#src reduced vocaburaly: %d") % src_num_reduced_words);
     Tracer::println(1, format("#trg reduced vocaburaly: %d") % trg_num_reduced_words);
 
-    auto model1_translation_prob = Aligner::Aligner::trainIbmModel1(
+    auto model1_translation_prob = Aligner::trainIbmModel1(
         src_sentence_list,
         trg_sentence_list,
         src_num_reduced_words,
@@ -209,7 +209,7 @@ int main(int argc, char * argv[]) {
         NULL_ID,
         args["model1-iteration"].as<int>());
 
-    Aligner::Aligner::trainHmmModel(
+    Aligner::trainHmmModel(
         src_sentence_list,
         trg_sentence_list,
         model1_translation_prob,

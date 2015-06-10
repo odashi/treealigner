@@ -1,7 +1,7 @@
 #pragma once
 
-#include <aligner/Dictionary.h>
-#include <aligner/Tree.h>
+#include <treealigner/Dictionary.h>
+#include <treealigner/Tree.h>
 
 #include <fstream>
 #include <memory>
@@ -9,7 +9,7 @@
 #include <vector>
 #include <tuple>
 
-namespace Aligner {
+namespace TreeAligner {
 
 class Utility {
 
@@ -29,5 +29,5 @@ public:
 
 }; // class Utility
 
-} // namespace Aligner
+} // namespace TreeAligner
 

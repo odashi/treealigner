@@ -1,7 +1,7 @@
 nobase_include_HEADERS = \
-    aligner/Aligner.h \
-    aligner/Dictionary.h \
-    aligner/Tracer.h \
-    aligner/Tree.h \
-    aligner/assertion.h \
-    aligner/utils.h
+    treealigner/assertion.h \
+    treealigner/Aligner.h \
+    treealigner/Dictionary.h \
+    treealigner/Tracer.h \
+    treealigner/Tree.h \
+    treealigner/Utility.h

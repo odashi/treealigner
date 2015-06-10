@@ -1,4 +1,4 @@
-#include <aligner/Dictionary.h>
+#include <treealigner/Dictionary.h>
 
 #include <algorithm>
 #include <sstream>
@@ -6,7 +6,7 @@
 
 using namespace std;
 
-namespace Aligner {
+namespace TreeAligner {
 
 Dictionary::Dictionary() {}
 
@@ -39,5 +39,5 @@ string Dictionary::getWord(int id) const {
     return rev_[id];
 }
 
-} // namespace Aligner
+} // namespace TreeAligner
 

@@ -1,4 +1,4 @@
-#include <aligner/Tracer.h>
+#include <treealigner/Tracer.h>
 
 #include <boost/range/irange.hpp>
 
@@ -7,7 +7,7 @@
 using namespace std;
 using boost::irange;
 
-namespace Aligner {
+namespace TreeAligner {
 
 unsigned int Tracer::trace_level_ = 0;
 
@@ -29,5 +29,5 @@ void Tracer::setTraceLevel(unsigned int value) {
     trace_level_ = value;
 }
 
-} // namespace Aligner
+} // namespace TreeAligner
 
