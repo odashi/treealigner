@@ -215,19 +215,22 @@ void Aligner::trainHmmModel(
                 // remaining
                 double sum = 0.0;
                 for (int is : irange(0, src_len)) {
+                    double pt_it_is = pt[trg_sentence[it]][src_sentence[is]];
+                    double delta = 0.0;
                     for (int is2 : irange(is_min[is], is_max[is])) {
-                        a[it][is] += a[it - 1][is2] * pj[is][is2] * pt[trg_sentence[it]][src_sentence[is]];
-                        a[it][is] += a[it - 1][is2 + src_len] * pj[is][is2] * pt[trg_sentence[it]][src_sentence[is]];
+                        delta += (a[it - 1][is2] + a[it - 1][is2 + src_len]) * pj[is][is2] * pt_it_is;
                     }
-                    sum += a[it][is];
-                    a[it][is + src_len] += a[it - 1][is] * pj_null[is] * pt[trg_sentence[it]][src_null_id];
-                    a[it][is + src_len] += a[it - 1][is + src_len] * pj_null[is] * pt[trg_sentence[it]][src_null_id];
-                    sum += a[it][is + src_len];
+                    a[it][is] = delta;
+                    sum += delta;
+                    delta = (a[it - 1][is] + a[it - 1][is + src_len]) * pj_null[is] * pt[trg_sentence[it]][src_null_id];
+                    a[it][is + src_len] = delta;
+                    sum += delta;
                 }
-                scale[it] = 1.0 / sum;
+                double scale_it = 1.0 / sum;
+                scale[it] = scale_it;
                 for (int is : irange(0, src_len)) {
-                    a[it][is] *= scale[it];
-                    a[it][is + src_len] *= scale[it];
+                    a[it][is] *= scale_it;
+                    a[it][is + src_len] *= scale_it;
                 }
             }
 
@@ -270,19 +273,24 @@ void Aligner::trainHmmModel(
             for (int it : irange(1, trg_len)) {
                 double sum = 0.0;
                 for (int is : irange(0, src_len)) {
-                    for (int is2 : irange(is_min[is], is_max[is])) {
-                        double delta = a[it - 1][is2] * pj[is][is2] * pt[trg_sentence[it]][src_sentence[is]] * b[it][is];
-                        xi[is][is2] = delta;
-                        sum += delta;
-                        delta = a[it - 1][is2 + src_len] * pj[is][is2] * pt[trg_sentence[it]][src_sentence[is]] * b[it][is];
-                        xi[is][is2 + src_len] = delta;
-                        sum += delta;
+                    {
+                        double pt_and_b = pt[trg_sentence[it]][src_sentence[is]] * b[it][is];
+                        for (int is2 : irange(is_min[is], is_max[is])) {
+                            double pj_and_pt_and_b = pj[is][is2] * pt_and_b;
+                            double delta = a[it - 1][is2] * pj_and_pt_and_b;
+                            xi[is][is2] = delta;
+                            sum += delta;
+                            delta = a[it - 1][is2 + src_len] * pj_and_pt_and_b;
+                            xi[is][is2 + src_len] = delta;
+                            sum += delta;
+                        }
                     }
                     {
-                        double delta = a[it - 1][is] * pj_null[is] * pt[trg_sentence[it]][src_null_id] * b[it][is + src_len];
+                        double pj_and_pt_and_b = pj_null[is] * pt[trg_sentence[it]][src_null_id] * b[it][is + src_len];
+                        double delta = a[it - 1][is] * pj_and_pt_and_b;
                         xi[is + src_len][is] = delta;
                         sum += delta;
-                        delta = a[it - 1][is + src_len] * pj_null[is] * pt[trg_sentence[it]][src_null_id] * b[it][is + src_len];
+                        delta = a[it - 1][is + src_len] * pj_and_pt_and_b;
                         xi[is + src_len][is + src_len] = delta;
                         sum += delta;
                     }
