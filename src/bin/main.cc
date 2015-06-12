@@ -44,7 +44,7 @@ PO::variables_map parseOptions(int argc, char * argv[]) {
     // configuration
     PO::options_description opt_config("Configurations");
     opt_config.add_options()
-        ("method", PO::value<string>(), "alignment strategy\ncandidates: model1")
+        ("method", PO::value<string>(), "alignment strategy\ncandidates: model1, hmm")
         ("unknown-threshold", PO::value<int>()->default_value(5), "maximum frequency to assume the word is unknown")
         ("model1-iteration", PO::value<int>()->default_value(10), "number of iterations for IBM model 1 training")
         ("hmm-iteration", PO::value<int>()->default_value(10), "number of iterations for HMM model training")
@@ -101,19 +101,7 @@ void processModel1(
         src_null_id,
         args["model1-iteration"].as<int>());
 
-    /*
-    auto hmm_model = Aligner::trainHmmModel(
-        src_sentence_list,
-        trg_sentence_list,
-        model1_translation_prob,
-        src_num_reduced_words,
-        trg_num_reduced_words,
-        NULL_ID,
-        args["hmm-iteration"].as<int>(),
-        args["hmm-distance-limit"].as<int>());
-    */
-
-    Tracer::println(0, "Generating Viterbi alignment ...");
+    Tracer::println(0, "Generating IBM model 1 Viterbi alignment ...");
 
     for (size_t k : irange(0UL, src_sentence_list.size())) {
         auto align = Aligner::generateIbmModel1ViterbiAlignment(
@@ -129,6 +117,52 @@ void processModel1(
         }
         cout << endl;
     }
+}
+
+// generate HMM model Viterbi alignment
+void processHmm(
+    const vector<vector<int>> & src_sentence_list,
+    const vector<vector<int>> & trg_sentence_list,
+    int src_num_words,
+    int trg_num_words,
+    int src_null_id,
+    const PO::variables_map & args) {
+
+    auto model1_translation_prob = Aligner::trainIbmModel1(
+        src_sentence_list,
+        trg_sentence_list,
+        src_num_words,
+        trg_num_words,
+        src_null_id,
+        args["model1-iteration"].as<int>());
+
+    auto hmm_model = Aligner::trainHmmModel(
+        src_sentence_list,
+        trg_sentence_list,
+        model1_translation_prob,
+        src_num_words,
+        trg_num_words,
+        src_null_id,
+        args["hmm-iteration"].as<int>(),
+        args["hmm-distance-limit"].as<int>());
+
+    Tracer::println(0, "Generating HMM Viterbi alignment ...");
+
+    for (size_t k : irange(0UL, src_sentence_list.size())) {
+        auto align = Aligner::generateHmmViterbiAlignment(
+            src_sentence_list[k],
+            trg_sentence_list[k],
+            hmm_model,
+            src_num_words,
+            src_null_id);
+
+        for (size_t ia : irange(0UL, align.size())) {
+            if (ia > 0) cout << ' ';
+            cout << align[ia].first << '-' << align[ia].second;
+        }
+        cout << endl;
+    }
+
 }
 
 int main(int argc, char * argv[]) {
@@ -253,6 +287,14 @@ int main(int argc, char * argv[]) {
     const string method = args["method"].as<string>();
     if (method == "model1") {
         ::processModel1(
+            src_sentence_list,
+            trg_sentence_list,
+            src_num_reduced_words,
+            trg_num_reduced_words,
+            NULL_ID,
+            args);
+    } else if (method == "hmm") {
+        ::processHmm(
             src_sentence_list,
             trg_sentence_list,
             src_num_reduced_words,
