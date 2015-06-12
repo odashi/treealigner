@@ -332,7 +332,7 @@ HmmModel Aligner::trainHmmModel(
         Tracer::println(2, format("LL = %.10e") % log_likelihood);
     }
 
-    return HmmModel { std::move(pt), std::move(fj), fj_null };
+    return HmmModel { std::move(pt), std::move(fj), fj_null, distance_limit };
 }
 
 vector<pair<int, int>> Aligner::generateIbmModel1ViterbiAlignment(

@@ -10,6 +10,7 @@ struct HmmModel {
     std::vector<std::vector<double>> generation_prob;
     std::vector<double> jumping_factor;
     double null_jumping_factor;
+    double distance_limit;
 }; // struct HmmModel
 
 class Aligner {
