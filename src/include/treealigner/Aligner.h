@@ -58,6 +58,14 @@ private:
         int src_len,
         int distance_limit);
 
+    static std::tuple<std::vector<std::vector<double>>, std::vector<double>> calculateHmmJumpingProbability(
+        const std::vector<double> & jumping_factor,
+        double null_jumping_factor,
+        int src_len,
+        int distance_limit,
+        const std::vector<int> min_jumping_range,
+        const std::vector<int> max_jumping_range);
+
 }; // class Aligner
 
 } // namespace TreeAligner

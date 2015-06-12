@@ -168,19 +168,9 @@ HmmModel Aligner::trainHmmModel(
 
             // calculate jumping prob.
             // pj[is][is'] = Pj(is' -> is) = Fj(is - is') / sum[ Fj(j - is') for j = [0, src_len) ]
-            vector<vector<double>> pj(src_len, vector<double>(src_len, 0.0));
-            vector<double> pj_null(src_len, 0.0);
-            for (int is2 : irange(0, src_len)) {
-                double sum = 0.0;
-                for (int is : irange(is_min[is2], is_max[is2])) {
-                    sum += fj[is - is2 + distance_limit];
-                }
-                sum += fj_null;
-                for (int is : irange(is_min[is2], is_max[is2])) {
-                    pj[is][is2] = fj[is - is2 + distance_limit] / sum;
-                }
-                pj_null[is2] = fj_null / sum;
-            }
+            vector<vector<double>> pj;
+            vector<double> pj_null;
+            tie(pj, pj_null) = calculateHmmJumpingProbability(fj, fj_null, src_len, distance_limit, is_min, is_max);
 
             // scaling factor
             // scale[it]
@@ -411,6 +401,34 @@ tuple<vector<int>, vector<int>> Aligner::calculateHmmJumpingRange(
     }
 
     return make_tuple(std::move(is_min), std::move(is_max));
+}
+
+tuple<vector<vector<double>>, vector<double>> Aligner::calculateHmmJumpingProbability(
+    const std::vector<double> & jumping_factor,
+    double null_jumping_factor,
+    int src_len,
+    int distance_limit,
+    const std::vector<int> min_jumping_range,
+    const std::vector<int> max_jumping_range) {
+
+    vector<vector<double>> pj(src_len, vector<double>(src_len, 0.0));
+    vector<double> pj_null(src_len, 0.0);
+
+    for (int is2 : irange(0, src_len)) {
+        double sum = 0.0;
+
+        for (int is : irange(min_jumping_range[is2], max_jumping_range[is2])) {
+            sum += jumping_factor[is - is2 + distance_limit];
+        }
+        sum += null_jumping_factor;
+
+        for (int is : irange(min_jumping_range[is2], max_jumping_range[is2])) {
+            pj[is][is2] = jumping_factor[is - is2 + distance_limit] / sum;
+        }
+        pj_null[is2] = null_jumping_factor / sum;
+    }
+
+    return make_tuple(std::move(pj), std::move(pj_null));
 }
 
 } // namespace TreeAligner
