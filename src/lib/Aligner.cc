@@ -162,12 +162,9 @@ HmmModel Aligner::trainHmmModel(
             int trg_len = trg_sentence.size();
 
             // ranges of possible path connections
-            vector<int> is_min(src_len);
-            vector<int> is_max(src_len);
-            for (int is : irange(0, src_len)) {
-                is_min[is] = is > distance_limit ? is - distance_limit : 0;
-                is_max[is] = is < src_len - distance_limit ? is + distance_limit + 1 : src_len;
-            }
+            vector<int> is_min;
+            vector<int> is_max;
+            tie(is_min, is_max) = calculateHmmJumpingRange(src_len, distance_limit);
 
             // calculate jumping prob.
             // pj[is][is'] = Pj(is' -> is) = Fj(is - is') / sum[ Fj(j - is') for j = [0, src_len) ]
@@ -399,6 +396,21 @@ vector<pair<int, int>> Aligner::generateHmmViterbiAlignment(
     // TODO
     
     return align;
+}
+
+tuple<vector<int>, vector<int>> Aligner::calculateHmmJumpingRange(
+    int src_len,
+    int distance_limit) {
+
+    vector<int> is_min(src_len);
+    vector<int> is_max(src_len);
+
+    for (int is : irange(0, src_len)) {
+        is_min[is] = is > distance_limit ? is - distance_limit : 0;
+        is_max[is] = is < src_len - distance_limit ? is + distance_limit + 1 : src_len;
+    }
+
+    return make_tuple(std::move(is_min), std::move(is_max));
 }
 
 } // namespace TreeAligner

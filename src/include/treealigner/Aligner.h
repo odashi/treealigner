@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <tuple>
 #include <utility>
 
 namespace TreeAligner {
@@ -50,6 +51,12 @@ public:
         const HmmModel & hmm_model,
         int src_num_vocab,
         int src_null_id);
+
+private:
+    
+    static std::tuple<std::vector<int>, std::vector<int>> calculateHmmJumpingRange(
+        int src_len,
+        int distance_limit);
 
 }; // class Aligner
 
