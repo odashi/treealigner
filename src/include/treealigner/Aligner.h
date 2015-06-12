@@ -41,6 +41,14 @@ public:
         const std::vector<int> & src_sentence,
         const std::vector<int> & trg_sentence,
         const std::vector<std::vector<double>> & translation_prob,
+        int src_num_vocab,
+        int src_null_id);
+
+    static std::vector<std::pair<int, int>> generateHmmViterbiAlignment(
+        const std::vector<int> & src_sentence,
+        const std::vector<int> & trg_sentence,
+        const HmmModel & hmm_model,
+        int src_num_vocab,
         int src_null_id);
 
 }; // class Aligner

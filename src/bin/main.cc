@@ -120,6 +120,7 @@ void processModel1(
             src_sentence_list[k],
             trg_sentence_list[k],
             model1_translation_prob,
+            src_num_words,
             src_null_id);
 
         for (size_t ia : irange(0UL, align.size())) {

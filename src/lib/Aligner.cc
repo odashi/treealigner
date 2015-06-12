@@ -352,7 +352,11 @@ vector<pair<int, int>> Aligner::generateIbmModel1ViterbiAlignment(
     const vector<int> & src_sentence,
     const vector<int> & trg_sentence,
     const vector<vector<double>> & translation_prob,
+    int src_num_vocab,
     int src_null_id) {
+
+    MYASSERT(TreeAligner::Aligner::generateIbmModel1ViterbiAlignment, src_null_id >= 0);
+    MYASSERT(TreeAligner::Aligner::generateIbmModel1ViterbiAlignment, src_null_id < src_num_vocab);
     
     vector<pair<int, int>> align;
     int src_len = src_sentence.size();
@@ -374,6 +378,26 @@ vector<pair<int, int>> Aligner::generateIbmModel1ViterbiAlignment(
         }
     }
 
+    return align;
+}
+
+vector<pair<int, int>> Aligner::generateHmmViterbiAlignment(
+    const vector<int> & src_sentence,
+    const vector<int> & trg_sentence,
+    const HmmModel & hmm_model,
+    int src_num_vocab,
+    int src_null_id) {
+    
+    MYASSERT(TreeAligner::Aligner::generateIbmModel1ViterbiAlignment, src_null_id >= 0);
+    MYASSERT(TreeAligner::Aligner::generateIbmModel1ViterbiAlignment, src_null_id < src_num_vocab);
+    
+    int src_len = src_sentence.size();
+    int trg_len = trg_sentence.size();
+
+    vector<pair<int, int>> align;
+
+    // TODO
+    
     return align;
 }
 
