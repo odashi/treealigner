@@ -13,6 +13,9 @@ struct HmmModel {
     int distance_limit;
 }; // struct HmmModel
 
+struct TreeHmmModel {
+}; // struct TreeHmmModel
+
 class Aligner {
 
     Aligner() = delete;
@@ -35,6 +38,17 @@ public:
         const std::vector<std::vector<double>> & prior_translation_prob,
         const int src_num_vocab,
         const int trg_num_vocab,
+        const int src_null_id,
+        const int num_iteration,
+        const int distance_limit);
+
+    static TreeHmmModel trainTreeHmmModel(
+        const std::vector<Tree<int>> & src_corpus,
+        const std::vector<std::vector<int>> & trg_corpus,
+        const std::vector<std::vector<double>> & prior_translation_prob,
+        const int src_num_vocab,
+        const int trg_num_vocab,
+        const int src_num_tags,
         const int src_null_id,
         const int num_iteration,
         const int distance_limit);

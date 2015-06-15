@@ -32,9 +32,9 @@ vector<vector<double>> Aligner::trainIbmModel1(
     MYASSERT(TreeAligner::Aligner::calculateIbmModel1, src_corpus.size() == trg_corpus.size());
     MYASSERT(TreeAligner::Aligner::calculateIbmModel1, src_num_vocab > 0);
     MYASSERT(TreeAligner::Aligner::calculateIbmModel1, trg_num_vocab > 0);
-    MYASSERT(TreeAligner::Aligner::calculateIbmModel1, num_iteration >= 0);
     MYASSERT(TreeAligner::Aligner::calculateIbmModel1, src_null_id >= 0);
     MYASSERT(TreeAligner::Aligner::calculateIbmModel1, src_null_id < src_num_vocab);
+    MYASSERT(TreeAligner::Aligner::calculateIbmModel1, num_iteration >= 0);
 
     const int num_sentences = src_corpus.size();
 
@@ -128,9 +128,9 @@ HmmModel Aligner::trainHmmModel(
     MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_corpus.size() == trg_corpus.size());
     MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_num_vocab > 0);
     MYASSERT(TreeAligner::Aligner::calculateHmmModel, trg_num_vocab > 0);
-    MYASSERT(TreeAligner::Aligner::calculateHmmModel, num_iteration >= 0);
     MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_null_id >= 0);
     MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_null_id < src_num_vocab);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, num_iteration >= 0);
     MYASSERT(TreeAligner::Aligner::calculateHmmModel, distance_limit >= 0);
 
     const int num_sentences = src_corpus.size();
@@ -362,6 +362,34 @@ HmmModel Aligner::trainHmmModel(
     }
 
     return HmmModel { std::move(pt), std::move(fj), fj_null, distance_limit };
+}
+
+TreeHmmModel Aligner::trainTreeHmmModel(
+    const vector<Tree<int>> & src_corpus,
+    const vector<vector<int>> & trg_corpus,
+    const vector<vector<double>> & prior_translation_prob,
+    const int src_num_vocab,
+    const int trg_num_vocab,
+    const int src_num_tags,
+    const int src_null_id,
+    const int num_iteration,
+    const int distance_limit) {
+
+    Tracer::println(0, "Training HMM model ...");
+
+    // check constraints
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_corpus.size() == trg_corpus.size());
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_num_vocab > 0);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, trg_num_vocab > 0);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_num_tags > 0);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_null_id >= 0);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_null_id < src_num_vocab);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, num_iteration >= 0);
+    MYASSERT(TreeAligner::Aligner::calculateHmmModel, distance_limit >= 0);
+
+    // TODO
+
+    return TreeHmmModel {};
 }
 
 vector<pair<int, int>> Aligner::generateIbmModel1ViterbiAlignment(
