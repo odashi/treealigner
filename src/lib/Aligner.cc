@@ -167,102 +167,24 @@ HmmModel Aligner::trainHmmModel(
 
             auto range = calculateHmmJumpingRange(src_len, distance_limit);
 
-            // calculate jumping prob.
-            // pj[is][is'] = Pj(is' -> is) = Fj(is - is') / sum[ Fj(j - is') for j = [0, src_len) ]
+            // calculate jumping prob: pj[is][is'] = Pj(is' -> is)
             Tensor2<double> pj;
             vector<double> pj_null;
             tie(pj, pj_null) = calculateHmmJumpingProbability(fj, fj_null, src_len, distance_limit, range);
 
-            // scaling factor
-            // scale[it]
-            vector<double> scale(trg_len);
-
-            // alpha (forward) scaled prob.
-            // a[it][is]
-            Tensor2<double> a(trg_len, 2 * src_len, 0.0);
-            
-            // calculate alpha
-            {
-                // initial
-                double sum = 0.0;
-                const double initial_prob = 1.0 / (2.0 * src_len);
-                for (int is : irange(0, src_len)) {
-                    {
-                        const double delta = initial_prob * pt.at(trg_sentence[0], src_sentence[is]);
-                        a.at(0, is) = delta;
-                        sum += delta;
-                    }
-                    {
-                        const double delta = initial_prob * pt.at(trg_sentence[0], src_null_id);
-                        a.at(0, is + src_len) = delta;
-                        sum += delta;
-                    }
-                }
-                const double scale_0 = 1.0 / sum;
-                scale[0] = scale_0;
-                for (int is : irange(0, src_len)) {
-                    a.at(0, is) *= scale_0;
-                    a.at(0, is + src_len) *= scale_0;
-                }
-            }
-            for (int it : irange(1, trg_len)) {
-                // remaining
-                double sum = 0.0;
-                for (int is : irange(0, src_len)) {
-                    const double pt_it_is = pt.at(trg_sentence[it], src_sentence[is]);
-                    {
-                        double delta = 0.0;
-                        for (int is2 : irange(range.min[is], range.max[is])) {
-                            delta += (a.at(it - 1, is2) + a.at(it - 1, is2 + src_len)) * pj.at(is, is2) * pt_it_is;
-                        }
-                        a.at(it, is) = delta;
-                        sum += delta;
-                    }
-                    {
-                        const double delta = (a.at(it - 1, is) + a.at(it - 1, is + src_len)) * pj_null[is] * pt.at(trg_sentence[it], src_null_id);
-                        a.at(it, is + src_len) = delta;
-                        sum += delta;
-                    }
-                }
-                const double scale_it = 1.0 / sum;
-                scale[it] = scale_it;
-                for (int is : irange(0, src_len)) {
-                    a.at(it, is) *= scale_it;
-                    a.at(it, is + src_len) *= scale_it;
-                }
-            }
+            // alpha (forward) scaled prob: a[it][is]
+            Tensor2<double> a;
+            // scaling factor: scale[it]
+            vector<double> scale;
+            tie(a, scale) = performHmmForwardStep(src_sentence, trg_sentence, pt, pj, pj_null, src_null_id, range);
 
             // calculate log likelihood
             for (int it : irange(0, trg_len)) {
                 log_likelihood -= log(scale[it]);
             }
             
-            // beta (backward) scaled prob.
-            // b[it][is]
-            Tensor2<double> b(trg_len, 2 * src_len, 0.0);
-
-            // calculate beta (backward)
-            {
-                // final
-                for (int is : irange(0, 2 * src_len)) {
-                    b.at(trg_len - 1, is) = scale[trg_len - 1];
-                }
-            }
-            for (int it : irange(0, trg_len - 1) | reversed) {
-                // remaining
-                for (int is : irange(0, src_len)) {
-                    for (int is2 : irange(range.min[is], range.max[is])) {
-                        b.at(it, is) += b.at(it + 1, is2) * pj.at(is2, is) * pt.at(trg_sentence[it + 1], src_sentence[is2]);
-                    }
-                    b.at(it, is) += b.at(it + 1, is + src_len) * pj_null[is] * pt.at(trg_sentence[it + 1], src_null_id);
-                    b.at(it, is) *= scale[it];
-                    for (int is2 : irange(0, src_len)) {
-                        b.at(it, is + src_len) += b.at(it + 1, is2) * pj.at(is2, is) * pt.at(trg_sentence[it + 1], src_sentence[is2]);
-                    }
-                    b.at(it, is + src_len) += b.at(it + 1, is + src_len) * pj_null[is] * pt.at(trg_sentence[it + 1], src_null_id);
-                    b.at(it, is + src_len) *= scale[it];
-                }
-            }
+            // beta (backward) scaled prob: b[it][is]
+            Tensor2<double> b = performHmmBackwardStep(src_sentence, trg_sentence, pt, pj, pj_null, src_null_id, range, scale);
 
             // calculate jumping counts
             // xi[is][is2] = Pr( (it-1, is2) -> (it, is) ) * sum
@@ -590,6 +512,127 @@ tuple<Tensor2<double>, vector<double>> Aligner::calculateHmmJumpingProbability(
     }
 
     return make_tuple(std::move(pj), std::move(pj_null));
+}
+
+tuple<Tensor2<double>, vector<double>> Aligner::performHmmForwardStep(
+    const vector<int> & src_sentence,
+    const vector<int> & trg_sentence,
+    const Tensor2<double> & translation_prob,
+    const Tensor2<double> & jumping_prob,
+    const vector<double> & null_jumping_prob,
+    const int src_null_id,
+    const HmmJumpingRange & range) {
+
+    const int src_len = src_sentence.size();
+    const int trg_len = trg_sentence.size();
+
+    // aliases
+    const Tensor2<double> & pt = translation_prob;
+    const Tensor2<double> & pj = jumping_prob;
+    const vector<double> & pj_null = null_jumping_prob;
+
+    Tensor2<double> a(trg_len, 2 * src_len, 0.0);
+    vector<double> scale(trg_len);
+
+    // initial
+    {
+        double sum = 0.0;
+        const double initial_prob = 1.0 / (2.0 * src_len);
+        for (int is : irange(0, src_len)) {
+            {
+                const double delta = initial_prob * pt.at(trg_sentence[0], src_sentence[is]);
+                a.at(0, is) = delta;
+                sum += delta;
+            }
+            {
+                const double delta = initial_prob * pt.at(trg_sentence[0], src_null_id);
+                a.at(0, is + src_len) = delta;
+                sum += delta;
+            }
+        }
+        const double scale_0 = 1.0 / sum;
+        scale[0] = scale_0;
+        for (int is : irange(0, src_len)) {
+            a.at(0, is) *= scale_0;
+            a.at(0, is + src_len) *= scale_0;
+        }
+    }
+
+    // remaining
+    for (int it : irange(1, trg_len)) {
+        double sum = 0.0;
+        for (int is : irange(0, src_len)) {
+            const double pt_it_is = pt.at(trg_sentence[it], src_sentence[is]);
+            {
+                double delta = 0.0;
+                for (int is2 : irange(range.min[is], range.max[is])) {
+                    delta += (a.at(it - 1, is2) + a.at(it - 1, is2 + src_len)) * pj.at(is, is2) * pt_it_is;
+                }
+                a.at(it, is) = delta;
+                sum += delta;
+            }
+            {
+                const double delta = (a.at(it - 1, is) + a.at(it - 1, is + src_len)) * pj_null[is] * pt.at(trg_sentence[it], src_null_id);
+                a.at(it, is + src_len) = delta;
+                sum += delta;
+            }
+        }
+        const double scale_it = 1.0 / sum;
+        scale[it] = scale_it;
+        for (int is : irange(0, src_len)) {
+            a.at(it, is) *= scale_it;
+            a.at(it, is + src_len) *= scale_it;
+        }
+    }
+
+    return make_tuple(std::move(a), std::move(scale));
+}
+
+Tensor2<double> Aligner::performHmmBackwardStep(
+    const vector<int> & src_sentence,
+    const vector<int> & trg_sentence,
+    const Tensor2<double> & translation_prob,
+    const Tensor2<double> & jumping_prob,
+    const vector<double> & null_jumping_prob,
+    const int src_null_id,
+    const HmmJumpingRange & range,
+    const vector<double> & scaling_factor) {
+
+    const int src_len = src_sentence.size();
+    const int trg_len = trg_sentence.size();
+
+    // aliases
+    const Tensor2<double> & pt = translation_prob;
+    const Tensor2<double> & pj = jumping_prob;
+    const vector<double> & pj_null = null_jumping_prob;
+    const vector<double> & scale = scaling_factor;
+
+    Tensor2<double> b(trg_len, 2 * src_len, 0.0);
+
+    // final
+    {
+        for (int is : irange(0, 2 * src_len)) {
+            b.at(trg_len - 1, is) = scale[trg_len - 1];
+        }
+    }
+    
+    // remaining
+    for (int it : irange(0, trg_len - 1) | reversed) {
+        for (int is : irange(0, src_len)) {
+            for (int is2 : irange(range.min[is], range.max[is])) {
+                b.at(it, is) += b.at(it + 1, is2) * pj.at(is2, is) * pt.at(trg_sentence[it + 1], src_sentence[is2]);
+            }
+            b.at(it, is) += b.at(it + 1, is + src_len) * pj_null[is] * pt.at(trg_sentence[it + 1], src_null_id);
+            b.at(it, is) *= scale[it];
+            for (int is2 : irange(0, src_len)) {
+                b.at(it, is + src_len) += b.at(it + 1, is2) * pj.at(is2, is) * pt.at(trg_sentence[it + 1], src_sentence[is2]);
+            }
+            b.at(it, is + src_len) += b.at(it + 1, is + src_len) * pj_null[is] * pt.at(trg_sentence[it + 1], src_null_id);
+            b.at(it, is + src_len) *= scale[it];
+        }
+    }
+
+    return b;
 }
 
 } // namespace TreeAligner

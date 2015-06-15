@@ -88,6 +88,25 @@ private:
         const int distance_limit,
         const HmmJumpingRange & range);
 
+    static std::tuple<Tensor2<double>, std::vector<double>> performHmmForwardStep(
+        const std::vector<int> & src_sentence,
+        const std::vector<int> & trg_sentence,
+        const Tensor2<double> & translation_prob,
+        const Tensor2<double> & jumping_prob,
+        const std::vector<double> & null_jumping_prob,
+        const int src_null_id,
+        const HmmJumpingRange & range);
+
+    static Tensor2<double> performHmmBackwardStep(
+        const std::vector<int> & src_sentence,
+        const std::vector<int> & trg_sentence,
+        const Tensor2<double> & translation_prob,
+        const Tensor2<double> & jumping_prob,
+        const std::vector<double> & null_jumping_prob,
+        const int src_null_id,
+        const HmmJumpingRange & range,
+        const std::vector<double> & scaling_factor);
+
 }; // class Aligner
 
 } // namespace TreeAligner
