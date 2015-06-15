@@ -1,5 +1,6 @@
 #pragma once
 
+#include <treealigner/Tensor.h>
 #include <treealigner/Tree.h>
 
 #include <vector>
@@ -14,7 +15,7 @@ struct HmmJumpingRange {
 }; // struct HmmJumpingRange
 
 struct HmmModel {
-    std::vector<std::vector<double>> generation_prob;
+    Tensor2<double> generation_prob;
     std::vector<double> jumping_factor;
     double null_jumping_factor;
     int distance_limit;
@@ -31,7 +32,7 @@ class Aligner {
 
 public:
     
-    static std::vector<std::vector<double>> trainIbmModel1(
+    static Tensor2<double> trainIbmModel1(
         const std::vector<std::vector<int>> & src_corpus,
         const std::vector<std::vector<int>> & trg_corpus,
         const int src_num_vocab,
@@ -42,7 +43,7 @@ public:
     static HmmModel trainHmmModel(
         const std::vector<std::vector<int>> & src_corpus,
         const std::vector<std::vector<int>> & trg_corpus,
-        const std::vector<std::vector<double>> & prior_translation_prob,
+        const Tensor2<double> & prior_translation_prob,
         const int src_num_vocab,
         const int trg_num_vocab,
         const int src_null_id,
@@ -52,7 +53,7 @@ public:
     static TreeHmmModel trainTreeHmmModel(
         const std::vector<Tree<int>> & src_corpus,
         const std::vector<std::vector<int>> & trg_corpus,
-        const std::vector<std::vector<double>> & prior_translation_prob,
+        const Tensor2<double> & prior_translation_prob,
         const int src_num_vocab,
         const int trg_num_vocab,
         const int src_num_tags,
@@ -63,7 +64,7 @@ public:
     static std::vector<std::pair<int, int>> generateIbmModel1ViterbiAlignment(
         const std::vector<int> & src_sentence,
         const std::vector<int> & trg_sentence,
-        const std::vector<std::vector<double>> & translation_prob,
+        const Tensor2<double> & translation_prob,
         const int src_num_vocab,
         const int src_null_id);
 
@@ -80,7 +81,7 @@ private:
         const int src_len,
         const int distance_limit);
 
-    static std::tuple<std::vector<std::vector<double>>, std::vector<double>> calculateHmmJumpingProbability(
+    static std::tuple<Tensor2<double>, std::vector<double>> calculateHmmJumpingProbability(
         const std::vector<double> & jumping_factor,
         const double null_jumping_factor,
         const int src_len,
