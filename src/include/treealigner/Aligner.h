@@ -8,6 +8,11 @@
 
 namespace TreeAligner {
 
+struct HmmJumpingRange {
+    std::vector<int> min;
+    std::vector<int> max;
+}; // struct HmmJumpingRange
+
 struct HmmModel {
     std::vector<std::vector<double>> generation_prob;
     std::vector<double> jumping_factor;
@@ -71,7 +76,7 @@ public:
 
 private:
     
-    static std::tuple<std::vector<int>, std::vector<int>> calculateHmmJumpingRange(
+    static HmmJumpingRange calculateHmmJumpingRange(
         const int src_len,
         const int distance_limit);
 
@@ -80,8 +85,7 @@ private:
         const double null_jumping_factor,
         const int src_len,
         const int distance_limit,
-        const std::vector<int> & min_jumping_range,
-        const std::vector<int> & max_jumping_range);
+        const HmmJumpingRange & range);
 
 }; // class Aligner
 

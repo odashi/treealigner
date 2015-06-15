@@ -165,16 +165,13 @@ HmmModel Aligner::trainHmmModel(
             const int src_len = src_sentence.size();
             const int trg_len = trg_sentence.size();
 
-            // ranges of possible path connections
-            vector<int> is_min;
-            vector<int> is_max;
-            tie(is_min, is_max) = calculateHmmJumpingRange(src_len, distance_limit);
+            auto range = calculateHmmJumpingRange(src_len, distance_limit);
 
             // calculate jumping prob.
             // pj[is][is'] = Pj(is' -> is) = Fj(is - is') / sum[ Fj(j - is') for j = [0, src_len) ]
             vector<vector<double>> pj;
             vector<double> pj_null;
-            tie(pj, pj_null) = calculateHmmJumpingProbability(fj, fj_null, src_len, distance_limit, is_min, is_max);
+            tie(pj, pj_null) = calculateHmmJumpingProbability(fj, fj_null, src_len, distance_limit, range);
 
             // scaling factor
             // scale[it]
@@ -215,7 +212,7 @@ HmmModel Aligner::trainHmmModel(
                     const double pt_it_is = pt[trg_sentence[it]][src_sentence[is]];
                     {
                         double delta = 0.0;
-                        for (int is2 : irange(is_min[is], is_max[is])) {
+                        for (int is2 : irange(range.min[is], range.max[is])) {
                             delta += (a[it - 1][is2] + a[it - 1][is2 + src_len]) * pj[is][is2] * pt_it_is;
                         }
                         a[it][is] = delta;
@@ -254,7 +251,7 @@ HmmModel Aligner::trainHmmModel(
             for (int it : irange(0, trg_len - 1) | reversed) {
                 // remaining
                 for (int is : irange(0, src_len)) {
-                    for (int is2 : irange(is_min[is], is_max[is])) {
+                    for (int is2 : irange(range.min[is], range.max[is])) {
                         b[it][is] += b[it + 1][is2] * pj[is2][is] * pt[trg_sentence[it + 1]][src_sentence[is2]];
                     }
                     b[it][is] += b[it + 1][is + src_len] * pj_null[is] * pt[trg_sentence[it + 1]][src_null_id];
@@ -276,7 +273,7 @@ HmmModel Aligner::trainHmmModel(
                 for (int is : irange(0, src_len)) {
                     {
                         const double pt_and_b = pt[trg_sentence[it]][src_sentence[is]] * b[it][is];
-                        for (int is2 : irange(is_min[is], is_max[is])) {
+                        for (int is2 : irange(range.min[is], range.max[is])) {
                             const double pj_and_pt_and_b = pj[is][is2] * pt_and_b;
                             {
                                 const double delta = a[it - 1][is2] * pj_and_pt_and_b;
@@ -305,7 +302,7 @@ HmmModel Aligner::trainHmmModel(
                     }
                 }
                 for (int is : irange(0, src_len)) {
-                    for (int is2 : irange(is_min[is], is_max[is])) {
+                    for (int is2 : irange(range.min[is], range.max[is])) {
                         cj[is - is2 + distance_limit] += xi[is][is2] / sum;
                         cj[is - is2 + distance_limit] += xi[is][is2 + src_len] / sum;
                     }
@@ -444,16 +441,13 @@ vector<pair<int, int>> Aligner::generateHmmViterbiAlignment(
     const double fj_null = hmm_model.null_jumping_factor;
     const double dl = hmm_model.distance_limit;
 
-    // ranges of possible path connections
-    vector<int> is_min;
-    vector<int> is_max;
-    tie(is_min, is_max) = calculateHmmJumpingRange(src_len, dl);
+    auto range = calculateHmmJumpingRange(src_len, dl);
 
     // calculate jumping prob.
     // pj[is][is'] = Pj(is' -> is) = Fj(is - is') / sum[ Fj(j - is') for j = [0, src_len) ]
     vector<vector<double>> pj;
     vector<double> pj_null;
-    tie(pj, pj_null) = calculateHmmJumpingProbability(fj, fj_null, src_len, dl, is_min, is_max);
+    tie(pj, pj_null) = calculateHmmJumpingProbability(fj, fj_null, src_len, dl, range);
 
     // scaling factor
     // scale[it]
@@ -497,7 +491,7 @@ vector<pair<int, int>> Aligner::generateHmmViterbiAlignment(
         for (int is : irange(0, src_len)) {
             {
                 double pt_it_is = pt[trg_sentence[it]][src_sentence[is]];
-                for (int is2 : irange(is_min[is], is_max[is])) {
+                for (int is2 : irange(range.min[is], range.max[is])) {
                     const double pj_and_pt = pj[is][is2] * pt_it_is;
                     {
                         const double score = viterbi[it - 1][is2] * pj_and_pt;
@@ -556,19 +550,19 @@ vector<pair<int, int>> Aligner::generateHmmViterbiAlignment(
     return align;
 }
 
-tuple<vector<int>, vector<int>> Aligner::calculateHmmJumpingRange(
+HmmJumpingRange Aligner::calculateHmmJumpingRange(
     const int src_len,
     const int distance_limit) {
 
-    vector<int> is_min(src_len);
-    vector<int> is_max(src_len);
+    vector<int> rmin(src_len);
+    vector<int> rmax(src_len);
 
     for (int is : irange(0, src_len)) {
-        is_min[is] = is > distance_limit ? is - distance_limit : 0;
-        is_max[is] = is < src_len - distance_limit ? is + distance_limit + 1 : src_len;
+        rmin[is] = is > distance_limit ? is - distance_limit : 0;
+        rmax[is] = is < src_len - distance_limit ? is + distance_limit + 1 : src_len;
     }
 
-    return make_tuple(std::move(is_min), std::move(is_max));
+    return HmmJumpingRange { std::move(rmin), std::move(rmax) };
 }
 
 tuple<vector<vector<double>>, vector<double>> Aligner::calculateHmmJumpingProbability(
@@ -576,8 +570,7 @@ tuple<vector<vector<double>>, vector<double>> Aligner::calculateHmmJumpingProbab
     const double null_jumping_factor,
     const int src_len,
     const int distance_limit,
-    const std::vector<int> & min_jumping_range,
-    const std::vector<int> & max_jumping_range) {
+    const HmmJumpingRange & range) {
 
     vector<vector<double>> pj(src_len, vector<double>(src_len, 0.0));
     vector<double> pj_null(src_len, 0.0);
@@ -585,12 +578,12 @@ tuple<vector<vector<double>>, vector<double>> Aligner::calculateHmmJumpingProbab
     for (int is2 : irange(0, src_len)) {
         double sum = 0.0;
 
-        for (int is : irange(min_jumping_range[is2], max_jumping_range[is2])) {
+        for (int is : irange(range.min[is2], range.max[is2])) {
             sum += jumping_factor[is - is2 + distance_limit];
         }
         sum += null_jumping_factor;
 
-        for (int is : irange(min_jumping_range[is2], max_jumping_range[is2])) {
+        for (int is : irange(range.min[is2], range.max[is2])) {
             pj[is][is2] = jumping_factor[is - is2 + distance_limit] / sum;
         }
         pj_null[is2] = null_jumping_factor / sum;
