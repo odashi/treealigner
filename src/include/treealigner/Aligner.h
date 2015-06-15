@@ -1,5 +1,7 @@
 #pragma once
 
+#include <treealigner/Tree.h>
+
 #include <vector>
 #include <tuple>
 #include <utility>
@@ -78,8 +80,8 @@ private:
         const double null_jumping_factor,
         const int src_len,
         const int distance_limit,
-        const std::vector<int> min_jumping_range,
-        const std::vector<int> max_jumping_range);
+        const std::vector<int> & min_jumping_range,
+        const std::vector<int> & max_jumping_range);
 
 }; // class Aligner
 

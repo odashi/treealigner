@@ -576,8 +576,8 @@ tuple<vector<vector<double>>, vector<double>> Aligner::calculateHmmJumpingProbab
     const double null_jumping_factor,
     const int src_len,
     const int distance_limit,
-    const std::vector<int> min_jumping_range,
-    const std::vector<int> max_jumping_range) {
+    const std::vector<int> & min_jumping_range,
+    const std::vector<int> & max_jumping_range) {
 
     vector<vector<double>> pj(src_len, vector<double>(src_len, 0.0));
     vector<double> pj_null(src_len, 0.0);
