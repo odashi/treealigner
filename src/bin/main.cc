@@ -44,7 +44,7 @@ PO::variables_map parseOptions(int argc, char * argv[]) {
     // configuration
     PO::options_description opt_config("Configurations");
     opt_config.add_options()
-        ("method", PO::value<string>(), "alignment strategy\ncandidates: model1, hmm")
+        ("method", PO::value<string>(), "alignment strategy\ncandidates: model1, hmm, treehmm")
         ("unknown-threshold", PO::value<int>()->default_value(5), "maximum frequency to assume the word is unknown")
         ("model1-iteration", PO::value<int>()->default_value(10), "number of iterations for IBM model 1 training")
         ("hmm-iteration", PO::value<int>()->default_value(10), "number of iterations for HMM model training")
@@ -162,7 +162,39 @@ void processHmm(
         }
         cout << endl;
     }
+}
 
+// generate Tree-HMM model Viterbi alignment
+void processTreeHmm(
+    const vector<vector<int>> & src_sentence_list,
+    const vector<vector<int>> & trg_sentence_list,
+    const vector<Tree<int>> & src_tree_list,
+    int src_num_words,
+    int trg_num_words,
+    int src_num_tags,
+    int src_null_id,
+    const PO::variables_map & args) {
+
+    auto model1_translation_prob = Aligner::trainIbmModel1(
+        src_sentence_list,
+        trg_sentence_list,
+        src_num_words,
+        trg_num_words,
+        src_null_id,
+        args["model1-iteration"].as<int>());
+
+    auto hmm_model = Aligner::trainTreeHmmModel(
+        src_tree_list,
+        trg_sentence_list,
+        model1_translation_prob,
+        src_num_words,
+        trg_num_words,
+        src_num_tags,
+        src_null_id,
+        args["hmm-iteration"].as<int>(),
+        args["hmm-distance-limit"].as<int>());
+
+    // TODO
 }
 
 int main(int argc, char * argv[]) {
@@ -299,6 +331,16 @@ int main(int argc, char * argv[]) {
             trg_sentence_list,
             src_num_reduced_words,
             trg_num_reduced_words,
+            NULL_ID,
+            args);
+    } else if (method == "treehmm") {
+        ::processTreeHmm(
+            src_sentence_list,
+            trg_sentence_list,
+            src_tree_list,
+            src_num_reduced_words,
+            trg_num_reduced_words,
+            src_tag_dict.size(),
             NULL_ID,
             args);
     } else {

@@ -7,6 +7,7 @@
 #include <boost/range/irange.hpp>
 
 #include <cmath>
+#include <functional>
 #include <iostream>
 #include <utility>
 #include <vector>
@@ -135,12 +136,10 @@ HmmModel Aligner::trainHmmModel(
 
     const int num_sentences = src_corpus.size();
 
-    // lexical translation prob.
-    // pt[t][s] = Pt(t|s)
+    // lexical translation prob: pt[t][s]
     Tensor2<double> pt = prior_translation_prob;
     
-    // jumping (transition) factor
-    // fj[d + distance_limit] = Fj(d) for x = [-distance_limit, distance_limit]
+    // jumping (transition) factor: fj[d + distance_limit]
     vector<double> fj(2 * distance_limit + 1, 1.0);
     double fj_null = 1.0;
 
@@ -149,7 +148,7 @@ HmmModel Aligner::trainHmmModel(
         Tracer::println(1, format("Iteration %d") % (iteration + 1));
 
         // probabilistic counts
-        // ct[t][s] = count(t|s)
+        // ct[t][s]
         Tensor2<double> ct(trg_num_vocab, src_num_vocab, 0.0);
         // sumct[s] = sum_t count(t|s)
         vector<double> sumct(src_num_vocab, 0.0);
@@ -294,7 +293,7 @@ TreeHmmModel Aligner::trainTreeHmmModel(
     const int num_iteration,
     const int distance_limit) {
 
-    Tracer::println(0, "Training HMM model ...");
+    Tracer::println(0, "Training Tree HMM model ...");
 
     // check constraints
     MYASSERT(TreeAligner::Aligner::calculateHmmModel, src_corpus.size() == trg_corpus.size());
@@ -306,7 +305,32 @@ TreeHmmModel Aligner::trainTreeHmmModel(
     MYASSERT(TreeAligner::Aligner::calculateHmmModel, num_iteration >= 0);
     MYASSERT(TreeAligner::Aligner::calculateHmmModel, distance_limit >= 0);
 
-    // TODO
+    const int num_sentences = src_corpus.size();
+
+    // lexical translation prob: pt[t][s]
+    Tensor2<double> pt = prior_translation_prob;
+    
+    // tree traversal probs:
+    // fj_pop[tag]
+    vector<double> pj_pop(src_num_tags, 1.0);
+    // fj_move[tag][d + distance_limit]
+    Tensor2<double> pj_move(src_num_tags, 2 * distance_limit + 1, 1.0);
+    // fj_push[tag][d + distance_limit]
+    Tensor2<double> pj_push(src_num_tags, 2 * distance_limit + 1, 1.0);
+    // fj_null
+    double pj_null = 1.0;
+
+    for (int iteration : irange(0, num_iteration)) {
+        
+        Tracer::println(1, format("Iteration %d") % (iteration + 1));
+        
+        for (int k : irange(0, num_sentences)) {
+            auto topdown_paths = calculateTopDownPaths(src_corpus[k]);
+            
+            // TODO
+        }
+
+    }
 
     return TreeHmmModel {};
 }
@@ -633,6 +657,33 @@ Tensor2<double> Aligner::performHmmBackwardStep(
     }
 
     return b;
+}
+
+vector<vector<TopDownPath>> Aligner::calculateTopDownPaths(const Tree<int> & tree) {
+    vector<vector<TopDownPath>> paths;
+    vector<TopDownPath> cur_path;
+
+    function<void(const Tree<int> &)> recursive
+        = [&recursive, &paths, &cur_path](const Tree<int> & node) {
+        
+        int d = node.size();
+        
+        if (d == 0) {
+            // add result
+            paths.push_back(cur_path);
+        } else {
+            // search child
+            for (int i : irange(0, d)) {
+                cur_path.push_back(TopDownPath { node.label(), i });
+                recursive(node[i]);
+                cur_path.pop_back();
+            }
+        }
+    };
+
+    recursive(tree);
+
+    return paths;
 }
 
 } // namespace TreeAligner

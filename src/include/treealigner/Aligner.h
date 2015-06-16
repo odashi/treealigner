@@ -22,7 +22,18 @@ struct HmmModel {
 }; // struct HmmModel
 
 struct TreeHmmModel {
+    Tensor2<double> generation_prob;
+    std::vector<double> pop_prob;
+    Tensor2<double> move_prob;
+    Tensor2<double> push_prob;
+    double null_prob;
+    int distance_limit;
 }; // struct TreeHmmModel
+
+struct TopDownPath {
+    int label;
+    int next;
+}; // struct TopDownPath
 
 class Aligner {
 
@@ -106,6 +117,8 @@ private:
         const int src_null_id,
         const HmmJumpingRange & range,
         const std::vector<double> & scaling_factor);
+
+    static std::vector<std::vector<TopDownPath>> calculateTopDownPaths(const Tree<int> & tree);
 
 }; // class Aligner
 
