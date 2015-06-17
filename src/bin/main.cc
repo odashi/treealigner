@@ -49,6 +49,9 @@ PO::variables_map parseOptions(int argc, char * argv[]) {
         ("model1-iteration", PO::value<int>()->default_value(10), "number of iterations for IBM model 1 training")
         ("hmm-iteration", PO::value<int>()->default_value(10), "number of iterations for HMM model training")
         ("hmm-distance-limit", PO::value<int>()->default_value(10), "maximum distance to connect HMM nodes")
+        ("treehmm-iteration", PO::value<int>()->default_value(10), "number of iterations for Tree-HMM model training")
+        ("treehmm-move-limit", PO::value<int>()->default_value(3), "maximum distance to perform MOVE traversal")
+        ("treehmm-push-limit", PO::value<int>()->default_value(3), "maximum distance to perform PUSH traversal")
         ;
     
     PO::options_description opt;
@@ -191,8 +194,9 @@ void processTreeHmm(
         trg_num_words,
         src_num_tags,
         src_null_id,
-        args["hmm-iteration"].as<int>(),
-        args["hmm-distance-limit"].as<int>());
+        args["treehmm-iteration"].as<int>(),
+        args["treehmm-move-limit"].as<int>(),
+        args["treehmm-push-limit"].as<int>());
 
     // TODO
 }

@@ -27,27 +27,40 @@ struct TreeHmmModel {
     Tensor2<double> move_prob;
     Tensor2<double> push_prob;
     double null_prob;
-    int distance_limit;
+    double stay_prob;
+    int move_limit;
+    int push_limit;
 }; // struct TreeHmmModel
 
 struct TopDownPath {
     int label;
     int next;
+    int degree;
 }; // struct TopDownPath
 
 inline bool operator==(const TopDownPath & a, const TopDownPath & b) {
-    return a.label == b.label && a.next == b.next;
+    return
+        a.label == b.label &&
+        a.next == b.next &&
+        a.degree == b.degree;
 }
 
 struct TreeHmmPath {
     enum Operation { POP, STOP, MOVE, PUSH };
     Operation op;
     int label;
-    int index; // used for MOVE and PUSH
+    int distance; // used for MOVE and PUSH
+    int range_min; // used for MOVE and PUSH
+    int range_max; // used for MOVE and PUSH
 }; // struct TreeHmmPath
 
 inline bool operator==(const TreeHmmPath & a, const TreeHmmPath & b) {
-    return a.op == b.op && a.label == b.label && a.index == b.index;
+    return
+        a.op == b.op &&
+        a.label == b.label &&
+        a.distance == b.distance &&
+        a.range_min == b.range_min &&
+        a.range_max == b.range_max;
 }
 
 class Aligner {
@@ -85,7 +98,8 @@ public:
         const int src_num_tags,
         const int src_null_id,
         const int num_iteration,
-        const int distance_limit);
+        const int move_limit,
+        const int push_limit);
 
     static std::vector<std::pair<int, int>> generateIbmModel1ViterbiAlignment(
         const std::vector<int> & src_sentence,
@@ -135,7 +149,9 @@ private:
         const Tree<int> & tree);
 
     static Tensor2<std::vector<TreeHmmPath>> calculateTreeHmmPaths(
-        const std::vector<std::vector<TopDownPath>> & topdown_paths);
+        const std::vector<std::vector<TopDownPath>> & topdown_paths,
+        const int move_limit,
+        const int push_limit);
 
 }; // class Aligner
 
