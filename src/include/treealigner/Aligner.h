@@ -35,6 +35,21 @@ struct TopDownPath {
     int next;
 }; // struct TopDownPath
 
+inline bool operator==(const TopDownPath & a, const TopDownPath & b) {
+    return a.label == b.label && a.next == b.next;
+}
+
+struct TreeHmmPath {
+    enum Operation { POP, STOP, MOVE, PUSH };
+    Operation op;
+    int label;
+    int index; // used for MOVE and PUSH
+}; // struct TreeHmmPath
+
+inline bool operator==(const TreeHmmPath & a, const TreeHmmPath & b) {
+    return a.op == b.op && a.label == b.label && a.index == b.index;
+}
+
 class Aligner {
 
     Aligner() = delete;
@@ -118,7 +133,11 @@ private:
         const HmmJumpingRange & range,
         const std::vector<double> & scaling_factor);
 
-    static std::vector<std::vector<TopDownPath>> calculateTopDownPaths(const Tree<int> & tree);
+    static std::vector<std::vector<TopDownPath>> calculateTopDownPaths(
+        const Tree<int> & tree);
+
+    static Tensor2<std::vector<TreeHmmPath>> calculateTreeHmmPaths(
+        const std::vector<std::vector<TopDownPath>> & topdown_paths);
 
 }; // class Aligner
 

@@ -311,14 +311,14 @@ TreeHmmModel Aligner::trainTreeHmmModel(
     Tensor2<double> pt = prior_translation_prob;
     
     // tree traversal probs:
-    // fj_pop[tag]
-    vector<double> pj_pop(src_num_tags, 1.0);
-    // fj_move[tag][d + distance_limit]
-    Tensor2<double> pj_move(src_num_tags, 2 * distance_limit + 1, 1.0);
-    // fj_push[tag][d + distance_limit]
-    Tensor2<double> pj_push(src_num_tags, 2 * distance_limit + 1, 1.0);
-    // fj_null
-    double pj_null = 1.0;
+    // pj_pop[tag]
+    vector<double> pj_pop(src_num_tags, 0.5);
+    // pj_move[tag][d + distance_limit]
+    Tensor2<double> pj_move(src_num_tags, 2 * distance_limit + 1, 1.0 / (2 * distance_limit + 1));
+    // pj_push[tag][d + distance_limit]
+    Tensor2<double> pj_push(src_num_tags, 2 * distance_limit + 1, 1.0 / (2 * distance_limit + 1));
+    // pj_null
+    double pj_null = 0.5;
 
     for (int iteration : irange(0, num_iteration)) {
         
@@ -326,6 +326,7 @@ TreeHmmModel Aligner::trainTreeHmmModel(
         
         for (int k : irange(0, num_sentences)) {
             auto topdown_paths = calculateTopDownPaths(src_corpus[k]);
+            auto treehmm_paths = calculateTreeHmmPaths(topdown_paths);
             
             // TODO
         }
@@ -659,7 +660,9 @@ Tensor2<double> Aligner::performHmmBackwardStep(
     return b;
 }
 
-vector<vector<TopDownPath>> Aligner::calculateTopDownPaths(const Tree<int> & tree) {
+vector<vector<TopDownPath>> Aligner::calculateTopDownPaths(
+    const Tree<int> & tree) {
+    
     vector<vector<TopDownPath>> paths;
     vector<TopDownPath> cur_path;
 
@@ -682,6 +685,54 @@ vector<vector<TopDownPath>> Aligner::calculateTopDownPaths(const Tree<int> & tre
     };
 
     recursive(tree);
+
+    /*
+    for (size_t i : irange(0UL, paths.size())) {
+        cout << i << ' ';
+        for (auto node : paths[i]) {
+            cout << format("[%d;%d] ") % node.label % node.next;
+        }
+        cout << endl;
+    }
+    */
+
+    return paths;
+}
+
+Tensor2<vector<TreeHmmPath>> Aligner::calculateTreeHmmPaths(
+    const vector<vector<TopDownPath>> & topdown_paths) {
+
+    int n = topdown_paths.size();
+    Tensor2<vector<TreeHmmPath>> paths(n, n);
+
+    for (int dst : irange(0, n)) {
+        for (int org : irange(0, n)) {
+            if (dst == org) continue;
+
+            const auto & dst_path = topdown_paths[dst];
+            const auto & org_path = topdown_paths[org];
+
+            size_t top = 0;
+            while (dst_path[top] == org_path[top]) ++top;
+
+            vector<TreeHmmPath> & path = paths.at(dst, org);
+
+            for (size_t k : irange(top + 1, org_path.size()) | reversed) {
+                path.push_back(TreeHmmPath { TreeHmmPath::POP, org_path[k].label, 0 });
+            }
+            path.push_back(TreeHmmPath { TreeHmmPath::STOP, org_path[top].label, 0 });
+            path.push_back(TreeHmmPath { TreeHmmPath::MOVE, dst_path[top].label, dst_path[top].next - org_path[top].next });
+            for (size_t k : irange(top + 1, dst_path.size())) {
+                path.push_back(TreeHmmPath { TreeHmmPath::PUSH, dst_path[k].label, dst_path[k].next });
+            }
+
+            /*
+            cout << format("%d <- %d: ") % dst % org;
+            for (auto node : path) cout << format("[%d: %d;%d] ") % node.op % node.label % node.index;
+            cout << endl;
+            */
+        }
+    }
 
     return paths;
 }
