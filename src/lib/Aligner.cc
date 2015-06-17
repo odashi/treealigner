@@ -136,12 +136,17 @@ HmmModel Aligner::trainHmmModel(
 
     const int num_sentences = src_corpus.size();
 
-    // lexical translation prob: pt[t][s]
-    Tensor2<double> pt = prior_translation_prob;
-    
-    // jumping (transition) factor: fj[d + distance_limit]
-    vector<double> fj(2 * distance_limit + 1, 1.0);
-    double fj_null = 1.0;
+    HmmModel model {
+        prior_translation_prob,
+        vector<double>(2 * distance_limit + 1, 1.0),
+        1.0,
+        distance_limit
+    };
+
+    // aliases
+    Tensor2<double> & pt = model.generation_prob;
+    vector<double> & fj = model.jumping_factor;
+    double & fj_null = model.null_jumping_factor;
 
     for (int iteration : irange(0, num_iteration)) {
         
@@ -169,7 +174,7 @@ HmmModel Aligner::trainHmmModel(
             // calculate jumping prob: pj[is][is'] = Pj(is' -> is)
             Tensor2<double> pj;
             vector<double> pj_null;
-            tie(pj, pj_null) = calculateHmmJumpingProbability(fj, fj_null, src_len, distance_limit, range);
+            tie(pj, pj_null) = calculateHmmJumpingProbability(model, src_len, range);
 
             // alpha (forward) scaled prob: a[it][is]
             Tensor2<double> a;
@@ -279,7 +284,7 @@ HmmModel Aligner::trainHmmModel(
         Tracer::println(2, format("LL = %.10e") % log_likelihood);
     }
 
-    return HmmModel { std::move(pt), std::move(fj), fj_null, distance_limit };
+    return model;
 }
 
 TreeHmmModel Aligner::trainTreeHmmModel(
@@ -372,7 +377,7 @@ vector<pair<int, int>> Aligner::generateIbmModel1ViterbiAlignment(
 vector<pair<int, int>> Aligner::generateHmmViterbiAlignment(
     const vector<int> & src_sentence,
     const vector<int> & trg_sentence,
-    const HmmModel & hmm_model,
+    const HmmModel & model,
     const int src_num_vocab,
     const int src_null_id) {
     
@@ -383,18 +388,15 @@ vector<pair<int, int>> Aligner::generateHmmViterbiAlignment(
     const int trg_len = trg_sentence.size();
 
     // aliases
-    const Tensor2<double> & pt = hmm_model.generation_prob;
-    const vector<double> & fj = hmm_model.jumping_factor;
-    const double fj_null = hmm_model.null_jumping_factor;
-    const double dl = hmm_model.distance_limit;
+    const Tensor2<double> & pt = model.generation_prob;
 
-    auto range = calculateHmmJumpingRange(src_len, dl);
+    auto range = calculateHmmJumpingRange(src_len, model.distance_limit);
 
     // calculate jumping prob.
     // pj[is][is'] = Pj(is' -> is) = Fj(is - is') / sum[ Fj(j - is') for j = [0, src_len) ]
     Tensor2<double> pj;
     vector<double> pj_null;
-    tie(pj, pj_null) = calculateHmmJumpingProbability(fj, fj_null, src_len, dl, range);
+    tie(pj, pj_null) = calculateHmmJumpingProbability(model, src_len, range);
 
     // scaling factor
     // scale[it]
@@ -513,27 +515,30 @@ HmmJumpingRange Aligner::calculateHmmJumpingRange(
 }
 
 tuple<Tensor2<double>, vector<double>> Aligner::calculateHmmJumpingProbability(
-    const std::vector<double> & jumping_factor,
-    const double null_jumping_factor,
+    const HmmModel & model,
     const int src_len,
-    const int distance_limit,
     const HmmJumpingRange & range) {
 
     Tensor2<double> pj(src_len, src_len, 0.0);
     vector<double> pj_null(src_len, 0.0);
 
+    // aliases
+    const vector<double> & fj = model.jumping_factor;
+    const double fj_null = model.null_jumping_factor;
+    const int dl = model.distance_limit;
+
     for (int is2 : irange(0, src_len)) {
         double sum = 0.0;
 
         for (int is : irange(range.min[is2], range.max[is2])) {
-            sum += jumping_factor[is - is2 + distance_limit];
+            sum += fj[is - is2 + dl];
         }
-        sum += null_jumping_factor;
+        sum += fj_null;
 
         for (int is : irange(range.min[is2], range.max[is2])) {
-            pj.at(is, is2) = jumping_factor[is - is2 + distance_limit] / sum;
+            pj.at(is, is2) = fj[is - is2 + dl] / sum;
         }
-        pj_null[is2] = null_jumping_factor / sum;
+        pj_null[is2] = fj_null / sum;
     }
 
     return make_tuple(std::move(pj), std::move(pj_null));

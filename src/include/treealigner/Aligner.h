@@ -97,7 +97,7 @@ public:
     static std::vector<std::pair<int, int>> generateHmmViterbiAlignment(
         const std::vector<int> & src_sentence,
         const std::vector<int> & trg_sentence,
-        const HmmModel & hmm_model,
+        const HmmModel & model,
         const int src_num_vocab,
         const int src_null_id);
 
@@ -108,10 +108,8 @@ private:
         const int distance_limit);
 
     static std::tuple<Tensor2<double>, std::vector<double>> calculateHmmJumpingProbability(
-        const std::vector<double> & jumping_factor,
-        const double null_jumping_factor,
+        const HmmModel & model,
         const int src_len,
-        const int distance_limit,
         const HmmJumpingRange & range);
 
     static std::tuple<Tensor2<double>, std::vector<double>> performHmmForwardStep(
