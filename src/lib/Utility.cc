@@ -81,9 +81,9 @@ Tree<int> Utility::parseTree(const string & text, Dictionary & tag_dict, Diction
     return root;
 }
 
-vector<int> Utility::extractWords(const Tree<int> & tree) {
-    function<void(const Tree<int> &, vector<int> &)> search_node
-        = [&search_node](const Tree<int> & node, vector<int> & result) -> void {
+Sentence<int> Utility::extractWords(const Tree<int> & tree) {
+    function<void(const Tree<int> &, Sentence<int> &)> search_node
+        = [&search_node](const Tree<int> & node, Sentence<int> & result) -> void {
         if (!node.size()) {
             result.push_back(node.label());
         } else {
@@ -91,7 +91,7 @@ vector<int> Utility::extractWords(const Tree<int> & tree) {
         }
     };
 
-    vector<int> result;
+    Sentence<int> result;
     search_node(tree, result);
     return result;
 }

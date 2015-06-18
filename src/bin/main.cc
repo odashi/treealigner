@@ -89,8 +89,8 @@ void initializeTracer(const PO::variables_map & args) {
 
 // generate IBM model 1 Viterbi alignment
 void processModel1(
-    const vector<vector<int>> & src_sentence_list,
-    const vector<vector<int>> & trg_sentence_list,
+    const vector<Sentence<int>> & src_sentence_list,
+    const vector<Sentence<int>> & trg_sentence_list,
     int src_num_words,
     int trg_num_words,
     int src_null_id,
@@ -116,7 +116,7 @@ void processModel1(
 
         for (size_t ia : irange(0UL, align.size())) {
             if (ia > 0) cout << ' ';
-            cout << align[ia].first << '-' << align[ia].second;
+            cout << align[ia].src << '-' << align[ia].trg;
         }
         cout << endl;
     }
@@ -124,8 +124,8 @@ void processModel1(
 
 // generate HMM model Viterbi alignment
 void processHmm(
-    const vector<vector<int>> & src_sentence_list,
-    const vector<vector<int>> & trg_sentence_list,
+    const vector<Sentence<int>> & src_sentence_list,
+    const vector<Sentence<int>> & trg_sentence_list,
     int src_num_words,
     int trg_num_words,
     int src_null_id,
@@ -161,7 +161,7 @@ void processHmm(
 
         for (size_t ia : irange(0UL, align.size())) {
             if (ia > 0) cout << ' ';
-            cout << align[ia].first << '-' << align[ia].second;
+            cout << align[ia].src << '-' << align[ia].trg;
         }
         cout << endl;
     }
@@ -169,8 +169,8 @@ void processHmm(
 
 // generate Tree-HMM model Viterbi alignment
 void processTreeHmm(
-    const vector<vector<int>> & src_sentence_list,
-    const vector<vector<int>> & trg_sentence_list,
+    const vector<Sentence<int>> & src_sentence_list,
+    const vector<Sentence<int>> & trg_sentence_list,
     const vector<Tree<int>> & src_tree_list,
     int src_num_words,
     int trg_num_words,
@@ -217,7 +217,7 @@ int main(int argc, char * argv[]) {
     Dictionary src_tag_dict, trg_tag_dict;
     Dictionary src_word_dict, trg_word_dict;
     vector<Tree<int>> src_tree_list, trg_tree_list;
-    vector<vector<int>> src_sentence_list, trg_sentence_list;
+    vector<Sentence<int>> src_sentence_list, trg_sentence_list;
 
     // add nul/unknown identifier
     src_word_dict.getId(NULL_WORD);

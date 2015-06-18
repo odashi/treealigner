@@ -1,7 +1,6 @@
 #pragma once
 
-#include <treealigner/RangedVector.h>
-#include <treealigner/Tensor.h>
+#include <treealigner/types.h>
 #include <treealigner/Tree.h>
 
 #include <vector>
@@ -11,23 +10,23 @@
 namespace TreeAligner {
 
 struct HmmJumpingRange {
-    std::vector<int> min;
-    std::vector<int> max;
+    Tensor1<int> min;
+    Tensor1<int> max;
 }; // struct HmmJumpingRange
 
 struct HmmModel {
     Tensor2<double> generation_prob;
-    RangedVector<double> jumping_factor;
+    RangedTensor1<double> jumping_factor;
     double null_jumping_factor;
     int distance_limit;
 }; // struct HmmModel
 
 struct TreeHmmModel {
-    Tensor2<double> generation_prob;
-    std::vector<double> pop_factor;
-    std::vector<double> stop_factor;
-    Tensor2<double> move_factor;
-    Tensor2<double> push_factor;
+    Tensor2<double> generation_prob; // pr[t][s]
+    Tensor1<double> pop_factor; // c[tag]
+    Tensor1<double> stop_factor; // c[tag]
+    Tensor1<RangedTensor1<double>> move_factor; // c[tag][pos]
+    Tensor1<RangedTensor1<double>> push_factor; // c[tag][pos]
     double leave_factor;
     double stay_factor;
     double null_factor;
@@ -36,10 +35,10 @@ struct TreeHmmModel {
 }; // struct TreeHmmModel
 
 struct TreeHmmJumpingProbabilityTable {
-    std::vector<double> pop_prob; // pr[tag]
-    std::vector<double> stop_prob; // pr[tag]
-    Tensor2<Tensor2<double>> move_prob; // pr[tag, min, max, pos]
-    Tensor2<Tensor2<double>> push_prob; // pr[tag, min, max, pos]
+    Tensor1<double> pop_prob; // pr[tag]
+    Tensor1<double> stop_prob; // pr[tag]
+    Tensor1<RangedTensor3<double>> move_prob; // pr[tag][min][max][pos]
+    Tensor1<RangedTensor3<double>> push_prob; // pr[tag][min][max][pos]
     double leave_prob;
     double stay_prob;
     double null_prob;
@@ -85,16 +84,16 @@ class Aligner {
 public:
     
     static Tensor2<double> trainIbmModel1(
-        const std::vector<std::vector<int>> & src_corpus,
-        const std::vector<std::vector<int>> & trg_corpus,
+        const std::vector<Sentence<int>> & src_corpus,
+        const std::vector<Sentence<int>> & trg_corpus,
         const int src_num_vocab,
         const int trg_num_vocab,
         const int src_null_id,
         const int num_iteration);
 
     static HmmModel trainHmmModel(
-        const std::vector<std::vector<int>> & src_corpus,
-        const std::vector<std::vector<int>> & trg_corpus,
+        const std::vector<Sentence<int>> & src_corpus,
+        const std::vector<Sentence<int>> & trg_corpus,
         const Tensor2<double> & prior_translation_prob,
         const int src_num_vocab,
         const int trg_num_vocab,
@@ -104,7 +103,7 @@ public:
 
     static TreeHmmModel trainTreeHmmModel(
         const std::vector<Tree<int>> & src_corpus,
-        const std::vector<std::vector<int>> & trg_corpus,
+        const std::vector<Sentence<int>> & trg_corpus,
         const Tensor2<double> & prior_translation_prob,
         const int src_num_vocab,
         const int trg_num_vocab,
@@ -114,16 +113,16 @@ public:
         const int move_limit,
         const int push_limit);
 
-    static std::vector<std::pair<int, int>> generateIbmModel1ViterbiAlignment(
-        const std::vector<int> & src_sentence,
-        const std::vector<int> & trg_sentence,
+    static std::vector<Alignment> generateIbmModel1ViterbiAlignment(
+        const Sentence<int> & src_sentence,
+        const Sentence<int> & trg_sentence,
         const Tensor2<double> & translation_prob,
         const int src_num_vocab,
         const int src_null_id);
 
-    static std::vector<std::pair<int, int>> generateHmmViterbiAlignment(
-        const std::vector<int> & src_sentence,
-        const std::vector<int> & trg_sentence,
+    static std::vector<Alignment> generateHmmViterbiAlignment(
+        const Sentence<int> & src_sentence,
+        const Sentence<int> & trg_sentence,
         const HmmModel & model,
         const int src_num_vocab,
         const int src_null_id);
@@ -134,29 +133,29 @@ private:
         const int src_len,
         const int distance_limit);
 
-    static std::tuple<Tensor2<double>, std::vector<double>> calculateHmmJumpingProbability(
+    static std::tuple<Tensor2<double>, Tensor1<double>> calculateHmmJumpingProbability(
         const HmmModel & model,
         const int src_len,
         const HmmJumpingRange & range);
 
-    static std::tuple<Tensor2<double>, std::vector<double>> performHmmForwardStep(
-        const std::vector<int> & src_sentence,
-        const std::vector<int> & trg_sentence,
+    static std::tuple<Tensor2<double>, Tensor1<double>> performHmmForwardStep(
+        const Sentence<int> & src_sentence,
+        const Sentence<int> & trg_sentence,
         const Tensor2<double> & translation_prob,
         const Tensor2<double> & jumping_prob,
-        const std::vector<double> & null_jumping_prob,
+        const Tensor1<double> & null_jumping_prob,
         const int src_null_id,
         const HmmJumpingRange & range);
 
     static Tensor2<double> performHmmBackwardStep(
-        const std::vector<int> & src_sentence,
-        const std::vector<int> & trg_sentence,
+        const Sentence<int> & src_sentence,
+        const Sentence<int> & trg_sentence,
         const Tensor2<double> & translation_prob,
         const Tensor2<double> & jumping_prob,
-        const std::vector<double> & null_jumping_prob,
+        const Tensor1<double> & null_jumping_prob,
         const int src_null_id,
         const HmmJumpingRange & range,
-        const std::vector<double> & scaling_factor);
+        const Tensor1<double> & scaling_factor);
 
     static TreeHmmJumpingProbabilityTable calculateTreeHmmJumpingProbabilityTable(
         const TreeHmmModel & model);
@@ -168,7 +167,6 @@ private:
         const std::vector<std::vector<TopDownPath>> & topdown_paths,
         const int move_limit,
         const int push_limit);
-
 
 }; // class Aligner
 

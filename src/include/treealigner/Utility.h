@@ -1,5 +1,6 @@
 #pragma once
 
+#include <treealigner/types.h>
 #include <treealigner/Dictionary.h>
 #include <treealigner/Tree.h>
 
@@ -25,7 +26,7 @@ public:
     static Tree<int> parseTree(const std::string & text, Dictionary & tag_dict, Dictionary & word_dict);
 
     // extract word list from tree
-    static std::vector<int> extractWords(const Tree<int> & tree);
+    static Sentence<int> extractWords(const Tree<int> & tree);
 
 }; // class Utility
 
