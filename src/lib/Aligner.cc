@@ -533,8 +533,8 @@ tuple<Tensor2<double>, Tensor1<double>> Aligner::calculateHmmJumpingProbability(
     const int src_len,
     const HmmJumpingRange & range) {
 
-    auto pj = make_tensor2(src_len, src_len, 0.0);
-    auto pj_null = make_tensor1(src_len, 0.0);
+    auto pj = make_tensor2<double>(src_len, src_len, 0.0);
+    auto pj_null = make_tensor1<double>(src_len, 0.0);
 
     // aliases
     const auto & fj = model.jumping_factor;
@@ -574,7 +574,7 @@ tuple<Tensor2<double>, Tensor1<double>> Aligner::performHmmForwardStep(
     const auto & pj = jumping_prob;
     const auto & pj_null = null_jumping_prob;
 
-    auto a = make_tensor2(trg_len, 2 * src_len, 0.0);
+    auto a = make_tensor2<double>(trg_len, 2 * src_len, 0.0);
     auto scale = make_tensor1<double>(trg_len);
 
     // initial
