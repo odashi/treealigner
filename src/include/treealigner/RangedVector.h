@@ -27,18 +27,20 @@ public:
         mem_ = src.mem_;
         min_ = src.min_;
         max_ = src.max_;
+        return *this;
     }
     inline RangedVector & operator=(RangedVector<T> && src) {
         mem_ = std::move(src.mem_);
         min_ = src.min_;
         max_ = src.max_;
+        return *this;
     }
 
-    inline const T & operator[](int index) const { return mem_[index - min]; }
-    inline T & operator[](int index) { return mem_[index - min]; }
+    inline const T & operator[](int index) const { return mem_[index - min_]; }
+    inline T & operator[](int index) { return mem_[index - min_]; }
 
-    inline const T & at(int index) const { return mem_.at(index - min); }
-    inline T & at(int index) { return mem_.at(index - min); }
+    inline const T & at(int index) const { return mem_.at(index - min_); }
+    inline T & at(int index) { return mem_.at(index - min_); }
 
     inline typename std::vector<T>::iterator begin() { return mem_.begin(); }
     inline typename std::vector<T>::const_iterator begin() const { return mem_.begin(); }

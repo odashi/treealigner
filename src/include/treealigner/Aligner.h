@@ -1,5 +1,6 @@
 #pragma once
 
+#include <treealigner/RangedVector.h>
 #include <treealigner/Tensor.h>
 #include <treealigner/Tree.h>
 
@@ -16,7 +17,7 @@ struct HmmJumpingRange {
 
 struct HmmModel {
     Tensor2<double> generation_prob;
-    std::vector<double> jumping_factor;
+    RangedVector<double> jumping_factor;
     double null_jumping_factor;
     int distance_limit;
 }; // struct HmmModel

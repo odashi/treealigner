@@ -138,14 +138,14 @@ HmmModel Aligner::trainHmmModel(
 
     HmmModel model {
         prior_translation_prob,
-        vector<double>(2 * distance_limit + 1, 1.0),
+        RangedVector<double>(-distance_limit, distance_limit, 1.0),
         1.0,
         distance_limit
     };
 
     // aliases
     Tensor2<double> & pt = model.generation_prob;
-    vector<double> & fj = model.jumping_factor;
+    RangedVector<double> & fj = model.jumping_factor;
     double & fj_null = model.null_jumping_factor;
 
     for (int iteration : irange(0, num_iteration)) {
@@ -158,7 +158,7 @@ HmmModel Aligner::trainHmmModel(
         // sumct[s] = sum_t count(t|s)
         vector<double> sumct(src_num_vocab, 0.0);
         // cj[d + distance_limit] = count(d)
-        vector<double> cj(2 * distance_limit + 1, 0.0);
+        RangedVector<double> cj(-distance_limit, distance_limit, 0.0);
         double cj_null = 0.0;
 
         double log_likelihood = 0.0;
@@ -229,8 +229,8 @@ HmmModel Aligner::trainHmmModel(
                 }
                 for (int is : irange(0, src_len)) {
                     for (int is2 : irange(range.min[is], range.max[is])) {
-                        cj[is - is2 + distance_limit] += xi.at(is, is2) / sum;
-                        cj[is - is2 + distance_limit] += xi.at(is, is2 + src_len) / sum;
+                        cj[is - is2] += xi.at(is, is2) / sum;
+                        cj[is - is2] += xi.at(is, is2 + src_len) / sum;
                     }
                     cj_null += xi.at(is + src_len, is) / sum;
                     cj_null += xi.at(is + src_len, is + src_len) / sum;
@@ -537,20 +537,19 @@ tuple<Tensor2<double>, vector<double>> Aligner::calculateHmmJumpingProbability(
     vector<double> pj_null(src_len, 0.0);
 
     // aliases
-    const vector<double> & fj = model.jumping_factor;
+    const RangedVector<double> & fj = model.jumping_factor;
     const double fj_null = model.null_jumping_factor;
-    const int dl = model.distance_limit;
 
     for (int is2 : irange(0, src_len)) {
         double sum = 0.0;
 
         for (int is : irange(range.min[is2], range.max[is2])) {
-            sum += fj[is - is2 + dl];
+            sum += fj[is - is2];
         }
         sum += fj_null;
 
         for (int is : irange(range.min[is2], range.max[is2])) {
-            pj.at(is, is2) = fj[is - is2 + dl] / sum;
+            pj.at(is, is2) = fj[is - is2] / sum;
         }
         pj_null[is2] = fj_null / sum;
     }
