@@ -748,9 +748,12 @@ vector<vector<TopDownPath>> Aligner::calculateTopDownPaths(
         }
     };
 
-    recursive(tree);
+    // remove topmost unary chain
+    const Tree<int> * root = &tree;
+    while (root->size() == 1) root = &(*root)[0];
 
-    /*
+    recursive(*root);
+
     for (size_t i : irange(0UL, paths.size())) {
         cout << i << ' ';
         for (auto node : paths[i]) {
@@ -758,7 +761,7 @@ vector<vector<TopDownPath>> Aligner::calculateTopDownPaths(
         }
         cout << endl;
     }
-    */
+    
 
     return paths;
 }
@@ -783,14 +786,13 @@ Tensor2<vector<TreeHmmPath>> Aligner::calculateTreeHmmPaths(
 
             auto & path = paths[dst][org];
 
-            // POP/THROUGH step
+            // POP step
             for (size_t k : irange(top + 1, org_path.size()) | reversed) {
-                auto op = org_path[k].degree == 1 ? TreeHmmPath::THROUGH : TreeHmmPath::POP;
-                path.push_back(TreeHmmPath { op, org_path[k].label, 0, 0, 0 });
+                path.push_back(TreeHmmPath { TreeHmmPath::POP, org_path[k].degree == 1, org_path[k].label, 0, 0, 0 });
             }
 
             // STOP step
-            path.push_back(TreeHmmPath { TreeHmmPath::STOP, org_path[top].label, 0, 0, 0 });
+            path.push_back(TreeHmmPath { TreeHmmPath::STOP, top == 0, org_path[top].label, 0, 0, 0 });
 
             // MOVE step
             {
@@ -804,47 +806,46 @@ Tensor2<vector<TreeHmmPath>> Aligner::calculateTreeHmmPaths(
                 if (move_range_min < -move_limit) move_range_min = -move_limit;
                 int move_range_max = org_path[top].degree - org_path[top].next - 1;
                 if (move_range_max > move_limit) move_range_max = move_limit;
-                path.push_back(TreeHmmPath { TreeHmmPath::MOVE, dst_path[top].label, move_distance, move_range_min, move_range_max + 1 });
+
+                path.push_back(TreeHmmPath { TreeHmmPath::MOVE, move_range_max - move_range_min == 1, dst_path[top].label, move_distance, move_range_min, move_range_max });
             }
 
             // PUSH step
             for (size_t k : irange(top + 1, dst_path.size())) {
-                int push_pos = dst_path[k].next < dst_path[k].degree - dst_path[k].next ? dst_path[k].next : dst_path[k].next - dst_path[k].degree;
+                const auto & cur = dst_path[k];
+                int push_pos = cur.next < cur.degree - cur.next ? cur.next : cur.next - cur.degree;
                 if (push_pos >= push_limit || push_pos < -push_limit) {
                     path.clear();
                     break;
                 }
 
-                int push_range_min = -(dst_path[k].degree / 2);
+                int push_range_min = -(cur.degree / 2);
                 if (push_range_min < -push_limit) push_range_min = -push_limit;
-                int push_range_max = (dst_path[k].degree - 1) / 2;
+                int push_range_max = (cur.degree - 1) / 2;
                 if (push_range_max >= push_limit) push_range_max = push_limit - 1;
                 
-                if (push_range_min == push_range_max) {
-                    path.push_back(TreeHmmPath { TreeHmmPath::THROUGH, dst_path[k].label, 0, 0, 0 });
-                } else {
-                    path.push_back(TreeHmmPath { TreeHmmPath::PUSH, dst_path[k].label, push_pos, push_range_min, push_range_max + 1 });
-                }
+                path.push_back(TreeHmmPath { TreeHmmPath::PUSH, push_range_min == push_range_max, cur.label, push_pos, push_range_min, push_range_max });
             }
         }
     }
 
-    /*
-    vector<string> op_str { "POP", "STOP", "MOVE", "PUSH", "THROUGH" };
+    
+    vector<string> op_str { "POP", "STOP", "MOVE", "PUSH" };
     for (int org : irange(0, n)) {
         for (int dst : irange(0, n)) {
             cout << format("%d -> %d: ") % org % dst;
-            for (auto node : paths.at(dst, org)) {
-                if (node.op == TreeHmmPath::POP || node.op == TreeHmmPath::STOP || node.op == TreeHmmPath::THROUGH) {
-                    cout << format("[%s; %d] ") % op_str[node.op] % node.label;
+            for (auto node : paths[dst][org]) {
+                if (node.op == TreeHmmPath::POP || node.op == TreeHmmPath::STOP) {
+                    cout << format(node.skip ? "(%s; %d) " : "[%s; %d] ") % op_str[node.op] % node.label;
                 } else {
-                    cout << format("[%s; %d, %d/%d:%d] ") % op_str[node.op] % node.label % node.distance % node.range_min % (node.range_max - 1);
+                    cout << format(node.skip ? "(%s; %d, %d/%d:%d) " : "[%s; %d, %d/%d:%d] ") % op_str[node.op] % node.label % node.distance % node.range_min % node.range_max;
                 }
             }
             cout << endl;
         }
     }
-    */
+    
+    exit(1);
     
     return paths;
 }

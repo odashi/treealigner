@@ -58,8 +58,9 @@ inline bool operator==(const TopDownPath & a, const TopDownPath & b) {
 }
 
 struct TreeHmmPath {
-    enum Operation { POP, STOP, MOVE, PUSH, THROUGH };
+    enum Operation { POP, STOP, MOVE, PUSH };
     Operation op;
+    bool skip;
     int label;
     int distance; // used for MOVE and PUSH
     int range_min; // used for MOVE and PUSH
