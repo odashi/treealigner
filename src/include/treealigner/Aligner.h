@@ -23,14 +23,26 @@ struct HmmModel {
 
 struct TreeHmmModel {
     Tensor2<double> generation_prob;
-    std::vector<double> pop_prob;
-    Tensor2<double> move_prob;
-    Tensor2<double> push_prob;
-    double null_prob;
-    double stay_prob;
+    std::vector<double> pop_factor;
+    std::vector<double> stop_factor;
+    Tensor2<double> move_factor;
+    Tensor2<double> push_factor;
+    double leave_factor;
+    double stay_factor;
+    double null_factor;
     int move_limit;
     int push_limit;
 }; // struct TreeHmmModel
+
+struct TreeHmmJumpingProbabilityTable {
+    std::vector<double> pop_prob; // pr[tag]
+    std::vector<double> stop_prob; // pr[tag]
+    Tensor2<Tensor2<double>> move_prob; // pr[tag, min, max, pos]
+    Tensor2<Tensor2<double>> push_prob; // pr[tag, min, max, pos]
+    double leave_prob;
+    double stay_prob;
+    double null_prob;
+}; // struct TreeHmmJumpingProbabilityTable
 
 struct TopDownPath {
     int label;
@@ -46,7 +58,7 @@ inline bool operator==(const TopDownPath & a, const TopDownPath & b) {
 }
 
 struct TreeHmmPath {
-    enum Operation { POP, STOP, MOVE, PUSH };
+    enum Operation { POP, STOP, MOVE, PUSH, THROUGH };
     Operation op;
     int label;
     int distance; // used for MOVE and PUSH
@@ -145,6 +157,9 @@ private:
         const HmmJumpingRange & range,
         const std::vector<double> & scaling_factor);
 
+    static TreeHmmJumpingProbabilityTable calculateTreeHmmJumpingProbabilityTable(
+        const TreeHmmModel & model);
+    
     static std::vector<std::vector<TopDownPath>> calculateTopDownPaths(
         const Tree<int> & tree);
 
@@ -152,6 +167,7 @@ private:
         const std::vector<std::vector<TopDownPath>> & topdown_paths,
         const int move_limit,
         const int push_limit);
+
 
 }; // class Aligner
 

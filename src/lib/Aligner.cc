@@ -316,9 +316,11 @@ TreeHmmModel Aligner::trainTreeHmmModel(
 
     TreeHmmModel model {
         prior_translation_prob,
-        vector<double>(src_num_tags, 0.5),
-        Tensor2<double>(src_num_tags, 2 * move_limit + 1, 1.0 / (2 * move_limit + 1)),
-        Tensor2<double>(src_num_tags, 2 * push_limit + 1, 1.0 / (2 * push_limit + 1)),
+        vector<double>(src_num_tags, 1.0),
+        vector<double>(src_num_tags, 1.0),
+        Tensor2<double>(src_num_tags, 2 * move_limit + 1, 1.0),
+        Tensor2<double>(src_num_tags, 2 * push_limit + 1, 1.0),
+        1.0,
         0.1,
         0.1,
         move_limit,
@@ -327,19 +329,23 @@ TreeHmmModel Aligner::trainTreeHmmModel(
 
     // aliases
     Tensor2<double> & pt = model.generation_prob;
-    vector<double> & pj_pop = model.pop_prob;
-    Tensor2<double> & pj_move = model.move_prob;
-    Tensor2<double> & pj_push = model.push_prob;
-    double & pj_null = model.null_prob;
-    double & pj_stay = model.stay_prob;
+    vector<double> & fj_pop = model.pop_factor;
+    vector<double> & fj_stop = model.pop_factor;
+    Tensor2<double> & fj_move = model.move_factor;
+    Tensor2<double> & fj_push = model.push_factor;
+    double & fj_leave = model.leave_factor;
+    double & fj_stay = model.stay_factor;
+    double & fj_null = model.null_factor;
 
     for (int iteration : irange(0, num_iteration)) {
         
         Tracer::println(1, format("Iteration %d") % (iteration + 1));
         
+        const auto pj_table = calculateTreeHmmJumpingProbabilityTable(model);
+        
         for (int k : irange(0, num_sentences)) {
-            auto topdown_paths = calculateTopDownPaths(src_corpus[k]);
-            auto treehmm_paths = calculateTreeHmmPaths(topdown_paths, move_limit, push_limit);
+            const auto topdown_paths = calculateTopDownPaths(src_corpus[k]);
+            const auto treehmm_paths = calculateTreeHmmPaths(topdown_paths, move_limit, push_limit);
             
             // TODO
         }
@@ -583,7 +589,7 @@ tuple<Tensor2<double>, vector<double>> Aligner::performHmmForwardStep(
                 sum += delta;
             }
             {
-                const double delta = initial_prob * pt.at(trg_sentence[0], src_null_id);
+                 const double delta = initial_prob * pt.at(trg_sentence[0], src_null_id);
                 a.at(0, is + src_len) = delta;
                 sum += delta;
             }
@@ -673,6 +679,53 @@ Tensor2<double> Aligner::performHmmBackwardStep(
     return b;
 }
 
+TreeHmmJumpingProbabilityTable Aligner::calculateTreeHmmJumpingProbabilityTable(
+    const TreeHmmModel & model) {
+
+    // aliases
+    int ml = model.move_limit;
+    int pl = model.push_limit;
+
+    int num_tags = model.pop_factor.size();
+
+    TreeHmmJumpingProbabilityTable pj_table {
+        vector<double>(model.pop_factor.size(), -1.0),
+        vector<double>(model.stop_factor.size(), -1.0),
+        Tensor2<Tensor2<double>>(num_tags, 2 * ml + 1, Tensor2<double>(2 * ml + 1, 2 * ml + 1, -1.0)),
+        Tensor2<Tensor2<double>>(num_tags, 2 * pl + 1, Tensor2<double>(2 * pl + 1, 2 * pl + 1, -1.0)),
+        -1.0,
+        -1.0,
+        -1.0
+    };
+
+    // leave/stay/null prob.
+    {
+        double sum = model.leave_factor + model.stay_factor + model.null_factor;
+        pj_table.leave_prob = model.leave_factor / sum;
+        pj_table.stay_prob = model.stay_factor / sum;
+        pj_table.null_prob = model.null_factor / sum;
+    }
+
+    // pop/stop prob.
+    for (int tag : irange(0, num_tags)) {
+        double sum = model.pop_factor[tag] + model.stop_factor[tag];
+        pj_table.pop_prob[tag] = model.pop_factor[tag] / sum;
+        pj_table.stop_prob[tag] = model.stop_factor[tag] / sum;
+    }
+
+    // move prob.
+    for (int tag : irange(0, num_tags)) {
+        for (int min : irange(-model.move_limit, 0)) {
+            for (int max : irange(1, model.move_limit + 1)) {
+                double sum = 0.0;
+                // TODO
+            }
+        }
+    }
+
+    return pj_table;
+}
+
 vector<vector<TopDownPath>> Aligner::calculateTopDownPaths(
     const Tree<int> & tree) {
     
@@ -732,9 +785,10 @@ Tensor2<vector<TreeHmmPath>> Aligner::calculateTreeHmmPaths(
 
             vector<TreeHmmPath> & path = paths.at(dst, org);
 
-            // POP step
+            // POP/THROUGH step
             for (size_t k : irange(top + 1, org_path.size()) | reversed) {
-                path.push_back(TreeHmmPath { TreeHmmPath::POP, org_path[k].label, 0, 0, 0 });
+                auto op = org_path[k].degree == 1 ? TreeHmmPath::THROUGH : TreeHmmPath::POP;
+                path.push_back(TreeHmmPath { op, org_path[k].label, 0, 0, 0 });
             }
 
             // STOP step
@@ -747,6 +801,7 @@ Tensor2<vector<TreeHmmPath>> Aligner::calculateTreeHmmPaths(
                     path.clear();
                     continue;
                 }
+
                 int move_range_min = -org_path[top].next;
                 if (move_range_min < -move_limit) move_range_min = -move_limit;
                 int move_range_max = org_path[top].degree - org_path[top].next - 1;
@@ -761,29 +816,38 @@ Tensor2<vector<TreeHmmPath>> Aligner::calculateTreeHmmPaths(
                     path.clear();
                     break;
                 }
+
                 int push_range_min = -(dst_path[k].degree / 2);
                 if (push_range_min < -push_limit) push_range_min = -push_limit;
                 int push_range_max = (dst_path[k].degree - 1) / 2;
                 if (push_range_max >= push_limit) push_range_max = push_limit - 1;
-                path.push_back(TreeHmmPath { TreeHmmPath::PUSH, dst_path[k].label, push_pos, push_range_min, push_range_max + 1 });
+                
+                if (push_range_min == push_range_max) {
+                    path.push_back(TreeHmmPath { TreeHmmPath::THROUGH, dst_path[k].label, 0, 0, 0 });
+                } else {
+                    path.push_back(TreeHmmPath { TreeHmmPath::PUSH, dst_path[k].label, push_pos, push_range_min, push_range_max + 1 });
+                }
             }
         }
     }
 
     /*
-    vector<string> op_str { "POP", "STOP", "MOVE", "PUSH" };
+    vector<string> op_str { "POP", "STOP", "MOVE", "PUSH", "THROUGH" };
     for (int org : irange(0, n)) {
         for (int dst : irange(0, n)) {
             cout << format("%d -> %d: ") % org % dst;
             for (auto node : paths.at(dst, org)) {
-                if (node.op == TreeHmmPath::POP || node.op == TreeHmmPath::STOP) cout << format("[%s; %d] ") % op_str[node.op] % node.label;
-                else cout << format("[%s; %d, %d/%d:%d] ") % op_str[node.op] % node.label % node.distance % node.range_min % (node.range_max - 1);
+                if (node.op == TreeHmmPath::POP || node.op == TreeHmmPath::STOP || node.op == TreeHmmPath::THROUGH) {
+                    cout << format("[%s; %d] ") % op_str[node.op] % node.label;
+                } else {
+                    cout << format("[%s; %d, %d/%d:%d] ") % op_str[node.op] % node.label % node.distance % node.range_min % (node.range_max - 1);
+                }
             }
             cout << endl;
         }
     }
     */
-
+    
     return paths;
 }
 
