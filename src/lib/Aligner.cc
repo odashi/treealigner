@@ -57,8 +57,8 @@ Tensor2<double> Aligner::trainIbmModel1(
         double log_likelihood = 0.0;
 
         for (int k : irange(0, num_sentences)) {
-            const auto & src_sentence = src_corpus[k];
-            const auto & trg_sentence = trg_corpus[k];
+            const auto & src_sent = src_corpus[k];
+            const auto & trg_sent = trg_corpus[k];
             
             // sum of prob. for each target word
             // sumpt[t] = sum_s Pt(t|s)
@@ -67,9 +67,9 @@ Tensor2<double> Aligner::trainIbmModel1(
             double likelihood = 0.0;
 
             //calculate sumpt[t] and ppl
-            for (int t : trg_sentence) {
+            for (int t : trg_sent) {
                 // inner words
-                for (int s : src_sentence) {
+                for (int s : src_sent) {
                     const double delta = pt[t][s];
                     sumpt[t] += delta;
                     likelihood += delta;
@@ -82,12 +82,12 @@ Tensor2<double> Aligner::trainIbmModel1(
                 }
             }
 
-            log_likelihood += log(likelihood) - trg_sentence.size() * log(src_sentence.size() + 1);
+            log_likelihood += log(likelihood) - trg_sent.size() * log(src_sent.size() + 1);
 
             // calculate c[t][s] and sumc[s]
-            for (int t : trg_sentence) {
+            for (int t : trg_sent) {
                 // inner words
-                for (int s : src_sentence) {
+                for (int s : src_sent) {
                     const double delta = pt[t][s] / sumpt[t];
                     c[t][s] += delta;
                     sumc[s] += delta;
@@ -154,21 +154,18 @@ HmmModel Aligner::trainHmmModel(
         Tracer::println(1, format("Iteration %d") % (iteration + 1));
 
         // probabilistic counts
-        // ct[t][s]
         auto ct = make_tensor2<double>(trg_num_vocab, src_num_vocab, 0.0);
-        // sumct[s] = sum_t count(t|s)
         auto sumct = make_tensor1<double>(src_num_vocab, 0.0);
-        // cj[d + distance_limit] = count(d)
         auto cj = make_ranged_tensor1<double>(-distance_limit, distance_limit, 0.0);
         double cj_null = 0.0;
 
         double log_likelihood = 0.0;
 
         for (int k : irange(0, num_sentences)) {
-            const auto & src_sentence = src_corpus[k];
-            const auto & trg_sentence = trg_corpus[k];
-            const int src_len = src_sentence.size();
-            const int trg_len = trg_sentence.size();
+            const auto & src_sent = src_corpus[k];
+            const auto & trg_sent = trg_corpus[k];
+            const int src_len = src_sent.size();
+            const int trg_len = trg_sent.size();
 
             const auto range = calculateHmmJumpingRange(src_len, distance_limit);
 
@@ -178,91 +175,36 @@ HmmModel Aligner::trainHmmModel(
 
             Tensor2<double> a;
             Tensor1<double> scale;
-            tie(a, scale) = performHmmForwardStep(src_sentence, trg_sentence, pt, pj, pj_null, src_null_id, range);
+            tie(a, scale) = performHmmForwardStep(src_sent, trg_sent, pt, pj, pj_null, src_null_id, range);
 
             // calculate likelihood
             for (int it : irange(0, trg_len)) {
                 log_likelihood -= log(scale[it]);
             }
             
-            auto b = performHmmBackwardStep(src_sentence, trg_sentence, pt, pj, pj_null, src_null_id, range, scale);
+            auto b = performHmmBackwardStep(src_sent, trg_sent, pt, pj, pj_null, src_null_id, range, scale);
+            auto xi = calculateHmmEdgeProbability(src_sent, trg_sent, pt, pj, pj_null, src_null_id, range, a, b);
+            auto gamma = calculateHmmNodeProbability(src_sent, trg_sent, a, b, scale);
 
-            // calculate jumping counts
-            // xi[is][is2] = Pr( (it-1, is2) -> (it, is) ) * sum
-            auto xi = make_tensor2<double>(2 * src_len, 2 * src_len, 0.0);
-
+            // update factors
             for (int it : irange(1, trg_len)) {
-                double sum = 0.0;
-                for (int is : irange(0, src_len)) {
-                    {
-                        const double pt_and_b = pt[trg_sentence[it]][src_sentence[is]] * b[it][is];
-                        for (int is2 : irange(range.min[is], range.max[is])) {
-                            const double pj_and_pt_and_b = pj[is][is2] * pt_and_b;
-                            {
-                                const double delta = a[it - 1][is2] * pj_and_pt_and_b;
-                                xi[is][is2] = delta;
-                                sum += delta;
-                            }
-                            {
-                                const double delta = a[it - 1][is2 + src_len] * pj_and_pt_and_b;
-                                xi[is][is2 + src_len] = delta;
-                                sum += delta;
-                            }
-                        }
-                    }
-                    {
-                        const double pj_and_pt_and_b = pj_null[is] * pt[trg_sentence[it]][src_null_id] * b[it][is + src_len];
-                        {
-                            const double delta = a[it - 1][is] * pj_and_pt_and_b;
-                            xi[is + src_len][is] = delta;
-                            sum += delta;
-                        }
-                        {
-                            const double delta = a[it - 1][is + src_len] * pj_and_pt_and_b;
-                            xi[is + src_len][is + src_len] = delta;
-                            sum += delta;
-                        }
-                    }
-                }
+                const auto & xi_it = xi[it];
                 for (int is : irange(0, src_len)) {
                     for (int is2 : irange(range.min[is], range.max[is])) {
-                        cj[is - is2] += xi[is][is2] / sum;
-                        cj[is - is2] += xi[is][is2 + src_len] / sum;
+                        cj[is - is2] += xi_it[is][is2];
+                        cj[is - is2] += xi_it[is][is2 + src_len];
                     }
-                    cj_null += xi[is + src_len][is] / sum;
-                    cj_null += xi[is + src_len][is + src_len] / sum;
+                    cj_null += xi_it[is + src_len][is];
+                    cj_null += xi_it[is + src_len][is + src_len];
                 }
             }
-
-            // calculate translation counts
-            // gamma[is] = Pr( (it, is) ) * sum
-            auto gamma = make_tensor1<double>(2 * src_len, 0.0);
-
             for (int it : irange(0, trg_len)) {
-                double sum = 0;
+                const auto gamma_it = gamma[it];
                 for (int is : irange(0, src_len)) {
-                    {
-                        const double delta = a[it][is] * b[it][is];
-                        gamma[is] = delta;
-                        sum += delta;
-                    }
-                    {
-                        const double delta = a[it][is + src_len] * b[it][is + src_len];
-                        gamma[is + src_len] = delta;
-                        sum += delta;
-                    }
-                }
-                for (int is : irange(0, src_len)) {
-                    {
-                        const double delta = gamma[is] / sum;
-                        ct[trg_sentence[it]][src_sentence[is]] += delta;
-                        sumct[src_sentence[is]] += delta;
-                    }
-                    {
-                        const double delta = gamma[is + src_len] / sum;
-                        ct[trg_sentence[it]][src_null_id] += delta;
-                        sumct[src_null_id] += delta;
-                    }
+                    ct[trg_sent[it]][src_sent[is]] += gamma_it[is];
+                    sumct[src_sent[is]] += gamma_it[is];
+                    ct[trg_sent[it]][src_null_id] += gamma_it[is + src_len];
+                    sumct[src_null_id] += gamma_it[is + src_len];
                 }
             }
         }
@@ -343,10 +285,10 @@ TreeHmmModel Aligner::trainTreeHmmModel(
         double log_likelihood = 0.0;
         
         for (int k : irange(0, num_sentences)) {
-            const auto src_sentence = Utility::extractWords(src_corpus[k]);
-            const auto & trg_sentence = trg_corpus[k];
-            const int src_len = src_sentence.size();
-            const int trg_len = trg_sentence.size();
+            const auto src_sent = Utility::extractWords(src_corpus[k]);
+            const auto & trg_sent = trg_corpus[k];
+            const int src_len = src_sent.size();
+            const int trg_len = trg_sent.size();
             
             const auto topdown_paths = calculateTopDownPaths(src_corpus[k]);
             const auto treehmm_paths = calculateTreeHmmPaths(topdown_paths, move_limit, push_limit);
@@ -359,14 +301,14 @@ TreeHmmModel Aligner::trainTreeHmmModel(
 
             Tensor2<double> a;
             Tensor1<double> scale;
-            tie(a, scale) = performHmmForwardStep(src_sentence, trg_sentence, pt, pj, pj_null, src_null_id, range);
+            tie(a, scale) = performHmmForwardStep(src_sent, trg_sent, pt, pj, pj_null, src_null_id, range);
 
             // calculate likelihood
             for (int it : irange(0, trg_len)) {
                 log_likelihood -= log(scale[it]);
             }
             
-            auto b = performHmmBackwardStep(src_sentence, trg_sentence, pt, pj, pj_null, src_null_id, range, scale);
+            auto b = performHmmBackwardStep(src_sent, trg_sent, pt, pj, pj_null, src_null_id, range, scale);
             // TODO
         }
 
@@ -377,8 +319,8 @@ TreeHmmModel Aligner::trainTreeHmmModel(
 }
 
 vector<Alignment> Aligner::generateIbmModel1ViterbiAlignment(
-    const Sentence<int> & src_sentence,
-    const Sentence<int> & trg_sentence,
+    const Sentence<int> & src_sent,
+    const Sentence<int> & trg_sent,
     const Tensor2<double> & translation_prob,
     const int src_num_vocab,
     const int src_null_id) {
@@ -387,15 +329,15 @@ vector<Alignment> Aligner::generateIbmModel1ViterbiAlignment(
     MYASSERT(TreeAligner::Aligner::generateIbmModel1ViterbiAlignment, src_null_id < src_num_vocab);
     
     vector<Alignment> align;
-    const int src_len = src_sentence.size();
-    const int trg_len = trg_sentence.size();
+    const int src_len = src_sent.size();
+    const int trg_len = trg_sent.size();
 
     for (int it : irange(0, trg_len)) {
-        const int t = trg_sentence[it];
+        const int t = trg_sent[it];
         int max_is = -1;
         double max_prob = -1.0;
         for (int is : irange(0, src_len)) {
-            const double prob = translation_prob[t][src_sentence[is]];
+            const double prob = translation_prob[t][src_sent[is]];
             if (prob > max_prob) {
                 max_is = is;
                 max_prob = prob;
@@ -410,8 +352,8 @@ vector<Alignment> Aligner::generateIbmModel1ViterbiAlignment(
 }
 
 vector<Alignment> Aligner::generateHmmViterbiAlignment(
-    const Sentence<int> & src_sentence,
-    const Sentence<int> & trg_sentence,
+    const Sentence<int> & src_sent,
+    const Sentence<int> & trg_sent,
     const HmmModel & model,
     const int src_num_vocab,
     const int src_null_id) {
@@ -419,8 +361,8 @@ vector<Alignment> Aligner::generateHmmViterbiAlignment(
     MYASSERT(TreeAligner::Aligner::generateIbmModel1ViterbiAlignment, src_null_id >= 0);
     MYASSERT(TreeAligner::Aligner::generateIbmModel1ViterbiAlignment, src_null_id < src_num_vocab);
     
-    const int src_len = src_sentence.size();
-    const int trg_len = trg_sentence.size();
+    const int src_len = src_sent.size();
+    const int trg_len = trg_sent.size();
 
     // aliases
     const auto & pt = model.generation_prob;
@@ -452,12 +394,12 @@ vector<Alignment> Aligner::generateHmmViterbiAlignment(
         const double initial_prob = 1.0 / (2.0 * src_len);
         for (int is : irange(0, src_len)) {
             {
-                const double delta = initial_prob * pt[trg_sentence[0]][src_sentence[is]];
+                const double delta = initial_prob * pt[trg_sent[0]][src_sent[is]];
                 viterbi[0][is] = delta;
                 sum += delta;
             }
             {
-                const double delta = initial_prob * pt[trg_sentence[0]][src_null_id];
+                const double delta = initial_prob * pt[trg_sent[0]][src_null_id];
                 viterbi[0][is + src_len] = delta;
                 sum += delta;
             }
@@ -474,7 +416,7 @@ vector<Alignment> Aligner::generateHmmViterbiAlignment(
         double sum = 0.0;
         for (int is : irange(0, src_len)) {
             {
-                double pt_it_is = pt[trg_sentence[it]][src_sentence[is]];
+                double pt_it_is = pt[trg_sent[it]][src_sent[is]];
                 for (int is2 : irange(range.min[is], range.max[is])) {
                     const double pj_and_pt = pj[is][is2] * pt_it_is;
                     {
@@ -495,7 +437,7 @@ vector<Alignment> Aligner::generateHmmViterbiAlignment(
                 sum += viterbi[it][is];
             }
             {
-                const double pj_and_pt = pj_null[is] * pt[trg_sentence[it]][src_null_id];
+                const double pj_and_pt = pj_null[is] * pt[trg_sent[it]][src_null_id];
                 if (viterbi[it - 1][is] > viterbi[it - 1][is + src_len]) {
                     viterbi[it][is + src_len] = viterbi[it - 1][is] * pj_and_pt;
                     prev[it][is + src_len] = is;
@@ -588,16 +530,16 @@ tuple<Tensor2<double>, Tensor1<double>> Aligner::calculateHmmJumpingProbability(
 }
 
 tuple<Tensor2<double>, Tensor1<double>> Aligner::performHmmForwardStep(
-    const Sentence<int> & src_sentence,
-    const Sentence<int> & trg_sentence,
+    const Sentence<int> & src_sent,
+    const Sentence<int> & trg_sent,
     const Tensor2<double> & translation_prob,
     const Tensor2<double> & jumping_prob,
     const Tensor1<double> & null_jumping_prob,
     const int src_null_id,
     const HmmJumpingRange & range) {
 
-    const int src_len = src_sentence.size();
-    const int trg_len = trg_sentence.size();
+    const int src_len = src_sent.size();
+    const int trg_len = trg_sent.size();
 
     // aliases
     const auto & pt = translation_prob;
@@ -613,12 +555,12 @@ tuple<Tensor2<double>, Tensor1<double>> Aligner::performHmmForwardStep(
         const double initial_prob = 1.0 / (2.0 * src_len);
         for (int is : irange(0, src_len)) {
             {
-                const double delta = initial_prob * pt[trg_sentence[0]][src_sentence[is]];
+                const double delta = initial_prob * pt[trg_sent[0]][src_sent[is]];
                 a[0][is] = delta;
                 sum += delta;
             }
             {
-                const double delta = initial_prob * pt[trg_sentence[0]][src_null_id];
+                const double delta = initial_prob * pt[trg_sent[0]][src_null_id];
                 a[0][is + src_len] = delta;
                 sum += delta;
             }
@@ -635,7 +577,7 @@ tuple<Tensor2<double>, Tensor1<double>> Aligner::performHmmForwardStep(
     for (int it : irange(1, trg_len)) {
         double sum = 0.0;
         for (int is : irange(0, src_len)) {
-            const double pt_it_is = pt[trg_sentence[it]][src_sentence[is]];
+            const double pt_it_is = pt[trg_sent[it]][src_sent[is]];
             {
                 double delta = 0.0;
                 for (int is2 : irange(range.min[is], range.max[is])) {
@@ -645,7 +587,7 @@ tuple<Tensor2<double>, Tensor1<double>> Aligner::performHmmForwardStep(
                 sum += delta;
             }
             {
-                const double delta = (a[it - 1][is] + a[it - 1][is + src_len]) * pj_null[is] * pt[trg_sentence[it]][src_null_id];
+                const double delta = (a[it - 1][is] + a[it - 1][is + src_len]) * pj_null[is] * pt[trg_sent[it]][src_null_id];
                 a[it][is + src_len] = delta;
                 sum += delta;
             }
@@ -662,8 +604,8 @@ tuple<Tensor2<double>, Tensor1<double>> Aligner::performHmmForwardStep(
 }
 
 Tensor2<double> Aligner::performHmmBackwardStep(
-    const Sentence<int> & src_sentence,
-    const Sentence<int> & trg_sentence,
+    const Sentence<int> & src_sent,
+    const Sentence<int> & trg_sent,
     const Tensor2<double> & translation_prob,
     const Tensor2<double> & jumping_prob,
     const Tensor1<double> & null_jumping_prob,
@@ -671,8 +613,8 @@ Tensor2<double> Aligner::performHmmBackwardStep(
     const HmmJumpingRange & range,
     const Tensor1<double> & scaling_factor) {
 
-    const int src_len = src_sentence.size();
-    const int trg_len = trg_sentence.size();
+    const int src_len = src_sent.size();
+    const int trg_len = trg_sent.size();
 
     // aliases
     const auto & pt = translation_prob;
@@ -693,20 +635,101 @@ Tensor2<double> Aligner::performHmmBackwardStep(
     for (int it : irange(0, trg_len - 1) | reversed) {
         for (int is : irange(0, src_len)) {
             for (int is2 : irange(range.min[is], range.max[is])) {
-                b[it][is] += b[it + 1][is2] * pj[is2][is] * pt[trg_sentence[it + 1]][src_sentence[is2]];
+                b[it][is] += b[it + 1][is2] * pj[is2][is] * pt[trg_sent[it + 1]][src_sent[is2]];
             }
-            b[it][is] += b[it + 1][is + src_len] * pj_null[is] * pt[trg_sentence[it + 1]][src_null_id];
+            b[it][is] += b[it + 1][is + src_len] * pj_null[is] * pt[trg_sent[it + 1]][src_null_id];
             b[it][is] *= scale[it];
             for (int is2 : irange(0, src_len)) {
-                b[it][is + src_len] += b[it + 1][is2] * pj[is2][is] * pt[trg_sentence[it + 1]][src_sentence[is2]];
+                b[it][is + src_len] += b[it + 1][is2] * pj[is2][is] * pt[trg_sent[it + 1]][src_sent[is2]];
             }
-            b[it][is + src_len] += b[it + 1][is + src_len] * pj_null[is] * pt[trg_sentence[it + 1]][src_null_id];
+            b[it][is + src_len] += b[it + 1][is + src_len] * pj_null[is] * pt[trg_sent[it + 1]][src_null_id];
             b[it][is + src_len] *= scale[it];
         }
     }
 
     return b;
 }
+
+Tensor3<double> Aligner::calculateHmmEdgeProbability(
+    const Sentence<int> & src_sent,
+    const Sentence<int> & trg_sent,
+    const Tensor2<double> & translation_prob,
+    const Tensor2<double> & jumping_prob,
+    const Tensor1<double> & null_jumping_prob,
+    const int src_null_id,
+    const HmmJumpingRange & range,
+    const Tensor2<double> & forward_prob,
+    const Tensor2<double> & backward_prob) {
+    
+    const int src_len = src_sent.size();
+    const int trg_len = trg_sent.size();
+
+    // aliases
+    const auto & pt = translation_prob;
+    const auto & pj = jumping_prob;
+    const auto & pj_null = null_jumping_prob;
+    const auto & a = forward_prob;
+    const auto & b = backward_prob;
+
+    auto xi = make_tensor3<double>(trg_len, 2 * src_len, 2 * src_len);
+
+    for (int it : irange(1, trg_len)) {
+        auto & xi_it = xi[it];
+        const auto & pt_trg = pt[trg_sent[it]];
+        const auto & a_it = a[it - 1];
+        const auto & b_it = b[it];
+        
+        for (int is : irange(0, src_len)) {
+            auto & xi_it_is = xi_it[is];
+            const auto & pj_is = pj[is];
+            const double pt_and_b = pt_trg[src_sent[is]] * b_it[is];
+
+            for (int is2 : irange(range.min[is], range.max[is])) {
+                const double pj_and_pt_and_b = pj_is[is2] * pt_and_b;
+                xi_it_is[is2] = a_it[is2] * pj_and_pt_and_b;
+                xi_it_is[is2 + src_len] = a_it[is2 + src_len] * pj_and_pt_and_b;
+            }
+
+            const double pj_and_pt_and_b = pj_null[is] * pt_trg[src_null_id] * b_it[is + src_len];
+            xi_it[is + src_len][is] = a_it[is] * pj_and_pt_and_b;
+            xi_it[is + src_len][is + src_len] = a_it[is + src_len] * pj_and_pt_and_b;
+        }
+    }
+    
+    return xi;
+}
+
+Tensor2<double> Aligner::calculateHmmNodeProbability(
+    const Sentence<int> & src_sent,
+    const Sentence<int> & trg_sent,
+    const Tensor2<double> & forward_prob,
+    const Tensor2<double> & backward_prob,
+    const Tensor1<double> & scaling_factor) {
+    
+    const int src_len = src_sent.size();
+    const int trg_len = trg_sent.size();
+
+    // aliases
+    const auto & a = forward_prob;
+    const auto & b = backward_prob;
+
+    auto gamma = make_tensor2<double>(trg_len, 2 * src_len);
+
+    for (int it : irange(0, trg_len)) {
+        auto & gamma_it = gamma[it];
+        const auto & a_it = a[it];
+        const auto & b_it = b[it];
+        const double factor = 1.0 / scaling_factor[it];
+
+        for (int is : irange(0, src_len)) {
+            gamma_it[is] = a_it[is] * b_it[is] * factor;
+            gamma_it[is + src_len] = a_it[is + src_len] * b_it[is + src_len] * factor;
+        }
+    }
+
+    return gamma;
+}
+
 
 TreeTraversalProbability Aligner::calculateTreeTraversalProbability(
     const TreeHmmModel & model) {
