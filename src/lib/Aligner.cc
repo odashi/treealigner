@@ -342,6 +342,7 @@ TreeHmmModel Aligner::trainTreeHmmModel(
         Tracer::println(1, format("Iteration %d") % (iteration + 1));
         
         const auto pj_table = calculateTreeHmmJumpingProbabilityTable(model);
+        exit(1);
         
         for (int k : irange(0, num_sentences)) {
             const auto topdown_paths = calculateTopDownPaths(src_corpus[k]);
@@ -715,8 +716,74 @@ TreeHmmJumpingProbabilityTable Aligner::calculateTreeHmmJumpingProbabilityTable(
     for (int tag : irange(0, num_tags)) {
         for (int min : irange(-ml, 1)) {
             for (int max : irange(0, ml + 1)) {
+                if (max - min < 2) continue;
                 double sum = 0.0;
-                // TODO
+                for (int pos : irange(min, max + 1)) {
+                    if (pos == 0) continue;
+                    sum += model.move_factor[tag][pos];
+                }
+                for (int pos : irange(min, max + 1)) {
+                    if (pos == 0) continue;
+                    pj_table.move_prob[tag][min][max][pos] = model.move_factor[tag][pos] / sum;
+                }
+            }
+        }
+    }
+
+    // push prob.
+    for (int tag : irange(0, num_tags)) {
+        for (int degree : irange(2, 2 * pl + 1)) {
+            int min = -(degree / 2);
+            int max = (degree - 1) / 2;
+            double sum = 0;
+            for (int pos : irange(min, max + 1)) {
+                sum += model.push_factor[tag][pos];
+            }
+            for (int pos : irange(min, max + 1)) {
+                pj_table.push_prob[tag][min][max][pos] = model.push_factor[tag][pos] / sum;
+            }
+        }
+    }
+
+    cout << format("leave: %.4f") % pj_table.leave_prob << endl;
+    cout << format("stay : %.4f") % pj_table.stay_prob << endl;
+    cout << format("null : %.4f") % pj_table.null_prob << endl;
+
+    cout << "pop, stop:" << endl;
+    for (int tag : irange(0, num_tags)) {
+        cout << format("  %2d: %.4f, %.4f") % tag % pj_table.pop_prob[tag] % pj_table.stop_prob[tag] << endl;
+    }
+
+    cout << "move:" << endl;
+    for (int tag : irange(0, num_tags)) {
+        cout << format("  tag=%2d:") % tag << endl;
+        for (int min : irange(-ml, ml + 1)) {
+            for (int max : irange(-ml, ml + 1)) {
+                cout << format("    min=%2d, max=%2d:") % min % max << endl;
+                for (int pos : irange(-ml, ml + 1)) {
+                    if (pj_table.move_prob[tag][min][max][pos] >= 0.0) {
+                        cout << format("      pos=%2d: %.4f") % pos % pj_table.move_prob[tag][min][max][pos] << endl;
+                    } else {
+                        cout << format("      pos=%2d: NA") % pos << endl;
+                    }
+                }
+            }
+        }
+    }
+
+    cout << "push:" << endl;
+    for (int tag : irange(0, num_tags)) {
+        cout << format("  tag=%2d:") % tag << endl;
+        for (int min : irange(-pl, pl + 1)) {
+            for (int max : irange(-pl, pl + 1)) {
+                cout << format("    min=%2d, max=%2d:") % min % max << endl;
+                for (int pos : irange(-pl, pl + 1)) {
+                    if (pj_table.push_prob[tag][min][max][pos] >= 0.0) {
+                        cout << format("      pos=%2d: %.4f") % pos % pj_table.push_prob[tag][min][max][pos] << endl;
+                    } else {
+                        cout << format("      pos=%2d: NA") % pos << endl;
+                    }
+                }
             }
         }
     }
@@ -754,6 +821,7 @@ vector<vector<TopDownPath>> Aligner::calculateTopDownPaths(
 
     recursive(*root);
 
+    /*
     for (size_t i : irange(0UL, paths.size())) {
         cout << i << ' ';
         for (auto node : paths[i]) {
@@ -761,7 +829,7 @@ vector<vector<TopDownPath>> Aligner::calculateTopDownPaths(
         }
         cout << endl;
     }
-    
+    */
 
     return paths;
 }
@@ -829,7 +897,7 @@ Tensor2<vector<TreeHmmPath>> Aligner::calculateTreeHmmPaths(
         }
     }
 
-    
+    /*
     vector<string> op_str { "POP", "STOP", "MOVE", "PUSH" };
     for (int org : irange(0, n)) {
         for (int dst : irange(0, n)) {
@@ -844,8 +912,7 @@ Tensor2<vector<TreeHmmPath>> Aligner::calculateTreeHmmPaths(
             cout << endl;
         }
     }
-    
-    exit(1);
+    */
     
     return paths;
 }
