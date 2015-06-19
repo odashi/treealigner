@@ -5,6 +5,7 @@ AM_CXXFLAGS = -I$(srcdir)/../include $(BOOST_CPPFLAGS) -DPKGDATADIR='"$(pkgdatad
 libtreealigner_la_SOURCES = \
     Aligner.cc \
     Dictionary.cc \
+    Hmm.cc \
     Tracer.cc \
     Utility.cc
 

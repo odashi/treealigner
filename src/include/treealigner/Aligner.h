@@ -9,10 +9,7 @@
 
 namespace TreeAligner {
 
-struct HmmJumpingRange {
-    Tensor1<int> min;
-    Tensor1<int> max;
-}; // struct HmmJumpingRange
+
 
 struct HmmModel {
     Tensor2<double> generation_prob;
@@ -129,55 +126,6 @@ public:
         const int src_null_id);
 
 private:
-    
-    static HmmJumpingRange calculateHmmFlatJumpingRange(
-        const int src_len);
-    
-    static HmmJumpingRange calculateHmmJumpingRange(
-        const int src_len,
-        const int distance_limit);
-
-    static std::tuple<Tensor2<double>, Tensor1<double>> calculateHmmJumpingProbability(
-        const HmmModel & model,
-        const int src_len,
-        const HmmJumpingRange & range);
-
-    static std::tuple<Tensor2<double>, Tensor1<double>> performHmmForwardStep(
-        const Sentence<int> & src_sent,
-        const Sentence<int> & trg_sent,
-        const Tensor2<double> & translation_prob,
-        const Tensor2<double> & jumping_prob,
-        const Tensor1<double> & null_jumping_prob,
-        const int src_null_id,
-        const HmmJumpingRange & range);
-
-    static Tensor2<double> performHmmBackwardStep(
-        const Sentence<int> & src_sent,
-        const Sentence<int> & trg_sent,
-        const Tensor2<double> & translation_prob,
-        const Tensor2<double> & jumping_prob,
-        const Tensor1<double> & null_jumping_prob,
-        const int src_null_id,
-        const HmmJumpingRange & range,
-        const Tensor1<double> & scaling_factor);
-
-    static Tensor3<double> calculateHmmEdgeProbability(
-        const Sentence<int> & src_sent,
-        const Sentence<int> & trg_sent,
-        const Tensor2<double> & translation_prob,
-        const Tensor2<double> & jumping_prob,
-        const Tensor1<double> & null_jumping_prob,
-        const int src_null_id,
-        const HmmJumpingRange & range,
-        const Tensor2<double> & forward_prob,
-        const Tensor2<double> & backward_prob);
-
-    static Tensor2<double> calculateHmmNodeProbability(
-        const Sentence<int> & src_sent,
-        const Sentence<int> & trg_sent,
-        const Tensor2<double> & forward_prob,
-        const Tensor2<double> & backward_prob,
-        const Tensor1<double> & scaling_factor);
 
     static TreeTraversalProbability calculateTreeTraversalProbability(
         const TreeHmmModel & model);
