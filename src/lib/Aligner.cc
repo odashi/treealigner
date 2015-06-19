@@ -1,5 +1,6 @@
 #include <treealigner/Aligner.h>
 #include <treealigner/Tracer.h>
+#include <treealigner/Utility.h>
 #include <treealigner/assertion.h>
 
 #include <boost/format.hpp>
@@ -169,25 +170,21 @@ HmmModel Aligner::trainHmmModel(
             const int src_len = src_sentence.size();
             const int trg_len = trg_sentence.size();
 
-            auto range = calculateHmmJumpingRange(src_len, distance_limit);
+            const auto range = calculateHmmJumpingRange(src_len, distance_limit);
 
-            // calculate jumping prob: pj[is][is'] = Pj(is' -> is)
             Tensor2<double> pj;
             Tensor1<double> pj_null;
             tie(pj, pj_null) = calculateHmmJumpingProbability(model, src_len, range);
 
-            // alpha (forward) scaled prob: a[it][is]
             Tensor2<double> a;
-            // scaling factor: scale[it]
             Tensor1<double> scale;
             tie(a, scale) = performHmmForwardStep(src_sentence, trg_sentence, pt, pj, pj_null, src_null_id, range);
 
-            // calculate log likelihood
+            // calculate likelihood
             for (int it : irange(0, trg_len)) {
                 log_likelihood -= log(scale[it]);
             }
             
-            // beta (backward) scaled prob: b[it][is]
             auto b = performHmmBackwardStep(src_sentence, trg_sentence, pt, pj, pj_null, src_null_id, range, scale);
 
             // calculate jumping counts
@@ -342,19 +339,38 @@ TreeHmmModel Aligner::trainTreeHmmModel(
         Tracer::println(1, format("Iteration %d") % (iteration + 1));
         
         auto pj_table = calculateTreeTraversalProbability(model);
+
+        double log_likelihood = 0.0;
         
         for (int k : irange(0, num_sentences)) {
+            const auto src_sentence = Utility::extractWords(src_corpus[k]);
+            const auto & trg_sentence = trg_corpus[k];
+            const int src_len = src_sentence.size();
+            const int trg_len = trg_sentence.size();
+            
             const auto topdown_paths = calculateTopDownPaths(src_corpus[k]);
             const auto treehmm_paths = calculateTreeHmmPaths(topdown_paths, move_limit, push_limit);
+
+            const auto range = calculateHmmFlatJumpingRange(src_len);
             
-            // jumping prob.
             Tensor2<double> pj;
             Tensor1<double> pj_null;
             tie(pj, pj_null) = calculateTreeHmmJumpingProbability(model, pj_table, treehmm_paths);
 
+            Tensor2<double> a;
+            Tensor1<double> scale;
+            tie(a, scale) = performHmmForwardStep(src_sentence, trg_sentence, pt, pj, pj_null, src_null_id, range);
+
+            // calculate likelihood
+            for (int it : irange(0, trg_len)) {
+                log_likelihood -= log(scale[it]);
+            }
+            
+            auto b = performHmmBackwardStep(src_sentence, trg_sentence, pt, pj, pj_null, src_null_id, range, scale);
             // TODO
         }
 
+        Tracer::println(2, format("LL = %.10e") % log_likelihood);
     }
 
     return TreeHmmModel {};
@@ -516,6 +532,15 @@ vector<Alignment> Aligner::generateHmmViterbiAlignment(
     }
     
     return align;
+}
+
+HmmJumpingRange Aligner::calculateHmmFlatJumpingRange(
+    const int src_len) {
+
+    return HmmJumpingRange {
+        make_tensor1<int>(src_len, 0),
+        make_tensor1<int>(src_len, src_len)
+    };
 }
 
 HmmJumpingRange Aligner::calculateHmmJumpingRange(

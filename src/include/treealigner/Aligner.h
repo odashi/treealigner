@@ -130,6 +130,9 @@ public:
 
 private:
     
+    static HmmJumpingRange calculateHmmFlatJumpingRange(
+        const int src_len);
+    
     static HmmJumpingRange calculateHmmJumpingRange(
         const int src_len,
         const int distance_limit);
