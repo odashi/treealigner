@@ -309,6 +309,10 @@ TreeHmmModel Aligner::trainTreeHmmModel(
             }
             
             auto b = performHmmBackwardStep(src_sent, trg_sent, pt, pj, pj_null, src_null_id, range, scale);
+            auto xi = calculateHmmEdgeProbability(src_sent, trg_sent, pt, pj, pj_null, src_null_id, range, a, b);
+            auto gamma = calculateHmmNodeProbability(src_sent, trg_sent, a, b, scale);
+
+            // update factors
             // TODO
         }
 
