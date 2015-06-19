@@ -34,7 +34,7 @@ struct TreeHmmModel {
     int push_limit;
 }; // struct TreeHmmModel
 
-struct TreeHmmJumpingProbabilityTable {
+struct TreeTraversalProbability {
     Tensor1<double> pop_prob; // pr[tag]
     Tensor1<double> stop_prob; // pr[tag]
     Tensor1<RangedTensor3<double>> move_prob; // pr[tag][min][max][pos]
@@ -158,7 +158,7 @@ private:
         const HmmJumpingRange & range,
         const Tensor1<double> & scaling_factor);
 
-    static TreeHmmJumpingProbabilityTable calculateTreeHmmJumpingProbabilityTable(
+    static TreeTraversalProbability calculateTreeTraversalProbability(
         const TreeHmmModel & model);
     
     static std::vector<std::vector<TopDownPath>> calculateTopDownPaths(
@@ -168,6 +168,11 @@ private:
         const std::vector<std::vector<TopDownPath>> & topdown_paths,
         const int move_limit,
         const int push_limit);
+
+    static std::tuple<Tensor2<double>, Tensor1<double>> calculateTreeHmmJumpingProbability(
+        const TreeHmmModel & model,
+        const TreeTraversalProbability & traversal_prob,
+        const Tensor2<std::vector<TreeHmmPath>> & paths);
 
 }; // class Aligner
 

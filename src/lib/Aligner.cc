@@ -341,13 +341,17 @@ TreeHmmModel Aligner::trainTreeHmmModel(
         
         Tracer::println(1, format("Iteration %d") % (iteration + 1));
         
-        const auto pj_table = calculateTreeHmmJumpingProbabilityTable(model);
-        exit(1);
+        auto pj_table = calculateTreeTraversalProbability(model);
         
         for (int k : irange(0, num_sentences)) {
             const auto topdown_paths = calculateTopDownPaths(src_corpus[k]);
             const auto treehmm_paths = calculateTreeHmmPaths(topdown_paths, move_limit, push_limit);
             
+            // jumping prob.
+            Tensor2<double> pj;
+            Tensor1<double> pj_null;
+            tie(pj, pj_null) = calculateTreeHmmJumpingProbability(model, pj_table, treehmm_paths);
+
             // TODO
         }
 
@@ -679,7 +683,7 @@ Tensor2<double> Aligner::performHmmBackwardStep(
     return b;
 }
 
-TreeHmmJumpingProbabilityTable Aligner::calculateTreeHmmJumpingProbabilityTable(
+TreeTraversalProbability Aligner::calculateTreeTraversalProbability(
     const TreeHmmModel & model) {
 
     // aliases
@@ -687,7 +691,7 @@ TreeHmmJumpingProbabilityTable Aligner::calculateTreeHmmJumpingProbabilityTable(
     const int pl = model.push_limit;
     const int num_tags = model.pop_factor.size();
 
-    TreeHmmJumpingProbabilityTable pj_table {
+    TreeTraversalProbability pj_table {
         make_tensor1<double>(model.pop_factor.size(), -1.0),
         make_tensor1<double>(model.stop_factor.size(), -1.0),
         make_tensor1(num_tags, make_ranged_tensor3<double>(-ml, ml, -ml, ml, -ml, ml, -1.0)),
@@ -745,6 +749,7 @@ TreeHmmJumpingProbabilityTable Aligner::calculateTreeHmmJumpingProbabilityTable(
         }
     }
 
+    /*
     cout << format("leave: %.4f") % pj_table.leave_prob << endl;
     cout << format("stay : %.4f") % pj_table.stay_prob << endl;
     cout << format("null : %.4f") % pj_table.null_prob << endl;
@@ -787,6 +792,7 @@ TreeHmmJumpingProbabilityTable Aligner::calculateTreeHmmJumpingProbabilityTable(
             }
         }
     }
+    */
 
     return pj_table;
 }
@@ -915,6 +921,21 @@ Tensor2<vector<TreeHmmPath>> Aligner::calculateTreeHmmPaths(
     */
     
     return paths;
+}
+
+tuple<Tensor2<double>, Tensor1<double>> Aligner::calculateTreeHmmJumpingProbability(
+    const TreeHmmModel & model,
+    const TreeTraversalProbability & traversal_prob,
+    const Tensor2<vector<TreeHmmPath>> & paths) {
+
+    const int src_len = paths.size();
+
+    auto pj = make_tensor2<double>(src_len, src_len, 0.0);
+    auto pj_null = make_tensor1(src_len, 0.0);
+
+    // TODO
+
+    return make_tuple(std::move(pj), std::move(pj_null));
 }
 
 } // namespace TreeAligner
