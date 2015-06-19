@@ -933,7 +933,55 @@ tuple<Tensor2<double>, Tensor1<double>> Aligner::calculateTreeHmmJumpingProbabil
     auto pj = make_tensor2<double>(src_len, src_len, 0.0);
     auto pj_null = make_tensor1(src_len, 0.0);
 
-    // TODO
+    for (int org : irange(0, src_len)) {
+        for (int dst : irange(0, src_len)) {
+            if (dst == org) {
+                // stay current position
+                pj[dst][org] = traversal_prob.stay_prob;
+            } else if (paths[dst][org].size() == 0) {
+                // unavailable path
+                pj[dst][org] = 0.0;
+            } else {
+                // go to other node
+                // calculate the product of traversal prob.
+                double & cur_pj = pj[dst][org];
+                cur_pj = traversal_prob.leave_prob;
+                for (auto node : paths[dst][org]) {
+                    if (node.skip) continue;
+                    switch (node.op) {
+                    case TreeHmmPath::POP:
+                        cur_pj *= traversal_prob.pop_prob[node.label];
+                        break;
+                    case TreeHmmPath::STOP:
+                        cur_pj *= traversal_prob.stop_prob[node.label];
+                        break;
+                    case TreeHmmPath::MOVE:
+                        cur_pj *= traversal_prob.move_prob[node.label][node.range_min][node.range_max][node.distance];
+                        break;
+                    case TreeHmmPath::PUSH:
+                        cur_pj *= traversal_prob.push_prob[node.label][node.range_min][node.range_max][node.distance];
+                        break;
+                    }
+                }
+            }
+        }
+
+        // null transition
+        pj_null[org] = traversal_prob.null_prob;
+    }
+
+    /*
+    for (int org : irange(0, src_len)) {
+        double sum = 0.0;
+        for (int dst : irange(0, src_len)) {
+            cout << format("%3d -> %3d: %.4f") % org % dst % pj[dst][org] << endl;
+            sum += pj[dst][org];
+        }
+        cout << format("%3d -> NUL: %.4f") % org % pj_null[org] << endl;
+        sum += pj_null[org];
+        cout << format("%3d -> ALL: %.4f") % org % sum << endl;
+    }
+    */
 
     return make_tuple(std::move(pj), std::move(pj_null));
 }
