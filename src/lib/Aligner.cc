@@ -187,32 +187,35 @@ HmmModel Aligner::trainHmmModel(
             auto xi = Hmm::getEdgeProbability(src_sent, trg_sent, pt, pj, pj_null, src_null_id, range, a, b);
             auto gamma = Hmm::getNodeProbability(src_sent, trg_sent, a, b, scale);
 
-            // update factors
+            // update jumping counts
             for (int it : irange(1, trg_len)) {
                 const auto & xi_it = xi[it];
-                for (int is : irange(0, src_len)) {
-                    for (int is2 : irange(range.min[is], range.max[is])) {
-                        cj[is - is2] += xi_it[is][is2];
-                        cj[is - is2] += xi_it[is][is2 + src_len];
+                for (int is_dst : irange(0, src_len)) {
+                    for (int is_org : irange(range.min[is_dst], range.max[is_dst])) {
+                        cj[is_dst - is_org] += xi_it[is_dst][is_org];
+                        cj[is_dst - is_org] += xi_it[is_dst][is_org + src_len];
                     }
-                    cj_null += xi_it[is + src_len][is];
-                    cj_null += xi_it[is + src_len][is + src_len];
+                    cj_null += xi_it[is_dst + src_len][is_dst];
+                    cj_null += xi_it[is_dst + src_len][is_dst + src_len];
                 }
             }
+
+            // update generation counts
             for (int it : irange(0, trg_len)) {
-                const auto gamma_it = gamma[it];
+                const auto & gamma_it = gamma[it];
+                auto & ct_trg = ct[trg_sent[it]];
                 for (int is : irange(0, src_len)) {
-                    ct[trg_sent[it]][src_sent[is]] += gamma_it[is];
+                    ct_trg[src_sent[is]] += gamma_it[is];
                     sumct[src_sent[is]] += gamma_it[is];
-                    ct[trg_sent[it]][src_null_id] += gamma_it[is + src_len];
+                    ct_trg[src_null_id] += gamma_it[is + src_len];
                     sumct[src_null_id] += gamma_it[is + src_len];
                 }
             }
         }
 
         // set new jumping factors
-        fj = cj;
-        fj_null = cj_null;
+        fj = std::move(cj);
+        fj_null = std::move(cj_null);
 
         // calculate pt[t][s]
         for (int t : irange(0, trg_num_vocab)) {
@@ -270,7 +273,7 @@ TreeHmmModel Aligner::trainTreeHmmModel(
     // aliases
     auto & pt = model.generation_prob;
     auto & fj_pop = model.pop_factor;
-    auto & fj_stop = model.pop_factor;
+    auto & fj_stop = model.stop_factor;
     auto & fj_move = model.move_factor;
     auto & fj_push = model.push_factor;
     auto & fj_leave = model.leave_factor;
@@ -280,6 +283,17 @@ TreeHmmModel Aligner::trainTreeHmmModel(
     for (int iteration : irange(0, num_iteration)) {
         
         Tracer::println(1, format("Iteration %d") % (iteration + 1));
+
+        // probabilistic counts
+        auto ct = make_tensor2<double>(trg_num_vocab, src_num_vocab, 0.0);
+        auto sumct = make_tensor1<double>(src_num_vocab, 0.0);
+        auto cj_pop = make_tensor1<double>(src_num_tags, 0.0);
+        auto cj_stop = make_tensor1<double>(src_num_tags, 0.0);
+        auto cj_move = make_tensor1(src_num_tags, make_ranged_tensor1<double>(-move_limit, move_limit, 0.0));
+        auto cj_push = make_tensor1(src_num_tags, make_ranged_tensor1<double>(-move_limit, move_limit, 0.0));
+        double cj_leave = 0.0;
+        double cj_stay = 0.0;
+        double cj_null = 0.0;
         
         auto pj_table = calculateTreeTraversalProbability(model);
 
@@ -313,8 +327,72 @@ TreeHmmModel Aligner::trainTreeHmmModel(
             auto xi = Hmm::getEdgeProbability(src_sent, trg_sent, pt, pj, pj_null, src_null_id, range, a, b);
             auto gamma = Hmm::getNodeProbability(src_sent, trg_sent, a, b, scale);
 
-            // update factors
-            // TODO
+            // update jumping counts
+            for (int it : irange(1, trg_len)) {
+                const auto & xi_it = xi[it];
+                for (int is_dst : irange(0, src_len)) {
+                    for (int is_org : irange(range.min[is_dst], range.max[is_dst])) {
+                        if (is_dst == is_org) {
+                            // stay factor
+                            cj_stay += xi_it[is_dst][is_org];
+                            cj_stay += xi_it[is_dst][is_org + src_len];
+                        } else {
+                            // leave factor
+                            double delta = xi_it[is_dst][is_org] + xi_it[is_dst][is_org + src_len];
+                            cj_leave += delta;
+                            // tree traversal factors
+                            for (const auto & node : treehmm_paths[is_dst][is_org]) {
+                                if (node.skip) continue;
+                                switch (node.op) {
+                                case TreeHmmPath::POP:
+                                    cj_pop[node.label] += delta;
+                                    break;
+                                case TreeHmmPath::STOP:
+                                    cj_stop[node.label] += delta;
+                                    break;
+                                case TreeHmmPath::MOVE:
+                                    cj_move[node.label][node.distance] += delta;
+                                    break;
+                                case TreeHmmPath::PUSH:
+                                    cj_push[node.label][node.distance] += delta;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    // null factor
+                    cj_null += xi_it[is_dst + src_len][is_dst];
+                    cj_null += xi_it[is_dst + src_len][is_dst + src_len];
+                }
+            }
+
+            // update generation counts
+            for (int it : irange(0, trg_len)) {
+                const auto & gamma_it = gamma[it];
+                auto & ct_trg = ct[trg_sent[it]];
+                for (int is : irange(0, src_len)) {
+                    ct_trg[src_sent[is]] += gamma_it[is];
+                    sumct[src_sent[is]] += gamma_it[is];
+                    ct_trg[src_null_id] += gamma_it[is + src_len];
+                    sumct[src_null_id] += gamma_it[is + src_len];
+                }
+            }
+        }
+
+        // set new jumping factors
+        fj_pop = std::move(cj_pop);
+        fj_stop = std::move(cj_stop);
+        fj_move = std::move(cj_move);
+        fj_push = std::move(cj_push);
+        fj_leave = std::move(cj_leave);
+        fj_stay = std::move(cj_stay);
+        fj_null = std::move(cj_null);
+
+        // calculate pt[t][s]
+        for (int t : irange(0, trg_num_vocab)) {
+            for (int s : irange(0, src_num_vocab)) {
+                pt[t][s] = (sumct[s] > 0.0) ? ct[t][s] / sumct[s] : 0.0;
+            }
         }
 
         Tracer::println(2, format("LL = %.10e") % log_likelihood);
@@ -746,7 +824,7 @@ tuple<Tensor2<double>, Tensor1<double>> Aligner::calculateTreeHmmJumpingProbabil
                 // calculate the product of traversal prob.
                 double & cur_pj = pj[dst][org];
                 cur_pj = traversal_prob.leave_prob;
-                for (auto node : paths[dst][org]) {
+                for (const auto & node : paths[dst][org]) {
                     if (node.skip) continue;
                     switch (node.op) {
                     case TreeHmmPath::POP:
