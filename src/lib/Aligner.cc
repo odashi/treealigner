@@ -470,7 +470,7 @@ vector<Alignment> Aligner::generateHmmViterbiAlignment(
     
     // previous position
     // prev[it][is]
-    auto prev = make_tensor2<double>(trg_len, 2 * src_len);
+    auto prev = make_tensor2<int>(trg_len, 2 * src_len);
 
     // forward step
     {
