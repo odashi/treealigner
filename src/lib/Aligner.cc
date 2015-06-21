@@ -295,7 +295,7 @@ TreeHmmModel Aligner::trainTreeHmmModel(
         double cj_stay = 0.0;
         double cj_null = 0.0;
         
-        auto pj_table = calculateTreeTraversalProbability(model);
+        const auto pj_table = calculateTreeTraversalProbability(model);
 
         double log_likelihood = 0.0;
         
@@ -398,7 +398,7 @@ TreeHmmModel Aligner::trainTreeHmmModel(
         Tracer::println(2, format("LL = %.10e") % log_likelihood);
     }
 
-    return TreeHmmModel {};
+    return model;
 }
 
 vector<Alignment> Aligner::generateIbmModel1ViterbiAlignment(
@@ -458,13 +458,43 @@ vector<Alignment> Aligner::generateHmmViterbiAlignment(
     Tensor1<double> pj_null;
     tie(pj, pj_null) = Hmm::getJumpingProbability(fj, fj_null, src_len, range);
 
-    // forward step
     Tensor2<double> viterbi;
     Tensor1<double> scale;
     Tensor2<int> prev;
     tie(viterbi, scale, prev) = Hmm::viterbiForwardStep(src_sent, trg_sent, pt, pj, pj_null, src_null_id, range);
 
-    // backward step
+    return getHmmViterbiAlignment(viterbi, prev);
+}
+
+vector<Alignment> Aligner::generateTreeHmmViterbiAlignment(
+    const Tree<int> & src_tree,
+    const Sentence<int> & trg_sent,
+    const TreeHmmModel & model,
+    const int src_num_vocab,
+    const int src_null_id) {
+
+    MYASSERT(TreeAligner::Aligner::generateIbmModel1ViterbiAlignment, src_null_id >= 0);
+    MYASSERT(TreeAligner::Aligner::generateIbmModel1ViterbiAlignment, src_null_id < src_num_vocab);
+    
+    const auto src_sent = Utility::extractWords(src_tree);
+    const int src_len = src_sent.size();
+
+    const auto topdown_paths = calculateTopDownPaths(src_tree);
+    const auto treehmm_paths = calculateTreeHmmPaths(topdown_paths, model.move_limit, model.push_limit);
+
+    const auto range = Hmm::getFlatJumpingRange(src_len);
+
+    const auto pj_table = calculateTreeTraversalProbability(model);
+
+    Tensor2<double> pj;
+    Tensor1<double> pj_null;
+    tie(pj, pj_null) = calculateTreeHmmJumpingProbability(model, pj_table, treehmm_paths);
+
+    Tensor2<double> viterbi;
+    Tensor1<double> scale;
+    Tensor2<int> prev;
+    tie(viterbi, scale, prev) = Hmm::viterbiForwardStep(src_sent, trg_sent, model.generation_prob, pj, pj_null, src_null_id, range);
+
     return getHmmViterbiAlignment(viterbi, prev);
 }
 

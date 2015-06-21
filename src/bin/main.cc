@@ -139,7 +139,7 @@ void processHmm(
         src_null_id,
         args["model1-iteration"].as<int>());
 
-    auto hmm_model = Aligner::trainHmmModel(
+    auto model = Aligner::trainHmmModel(
         src_sentence_list,
         trg_sentence_list,
         model1_translation_prob,
@@ -155,7 +155,7 @@ void processHmm(
         auto align = Aligner::generateHmmViterbiAlignment(
             src_sentence_list[k],
             trg_sentence_list[k],
-            hmm_model,
+            model,
             src_num_words,
             src_null_id);
 
@@ -186,7 +186,7 @@ void processTreeHmm(
         src_null_id,
         args["model1-iteration"].as<int>());
 
-    auto hmm_model = Aligner::trainTreeHmmModel(
+    auto model = Aligner::trainTreeHmmModel(
         src_tree_list,
         trg_sentence_list,
         model1_translation_prob,
@@ -198,7 +198,22 @@ void processTreeHmm(
         args["treehmm-move-limit"].as<int>(),
         args["treehmm-push-limit"].as<int>());
 
-    // TODO
+    Tracer::println(0, "Generating Tree-HMM Viterbi alignment ...");
+
+    for (size_t k : irange(0UL, src_tree_list.size())) {
+        auto align = Aligner::generateTreeHmmViterbiAlignment(
+            src_tree_list[k],
+            trg_sentence_list[k],
+            model,
+            src_num_words,
+            src_null_id);
+
+        for (size_t ia : irange(0UL, align.size())) {
+            if (ia > 0) cout << ' ';
+            cout << align[ia].src << '-' << align[ia].trg;
+        }
+        cout << endl;
+    }
 }
 
 int main(int argc, char * argv[]) {

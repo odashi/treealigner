@@ -125,6 +125,13 @@ public:
         const int src_num_vocab,
         const int src_null_id);
 
+    static std::vector<Alignment> generateTreeHmmViterbiAlignment(
+        const Tree<int> & src_tree,
+        const Sentence<int> & trg_sent,
+        const TreeHmmModel & model,
+        const int src_num_vocab,
+        const int src_null_id);
+
 private:
 
     static TreeTraversalProbability calculateTreeTraversalProbability(
