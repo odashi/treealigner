@@ -32,6 +32,8 @@ public:
         const int src_len,
         const HmmJumpingRange & range);
 
+    // return[0]: scaled forward prob.
+    // return[1]: scaling factor
     static std::tuple<Tensor2<double>, Tensor1<double>> forwardStep(
         const Sentence<int> & src_sent,
         const Sentence<int> & trg_sent,
@@ -50,6 +52,18 @@ public:
         const int src_null_id,
         const HmmJumpingRange & range,
         const Tensor1<double> & scaling_factor);
+
+    // return[0]: scaled viterbi prob.
+    // return[1]: scaling factor
+    // return[2]: previous position
+    static std::tuple<Tensor2<double>, Tensor1<double>, Tensor2<int>> viterbiForwardStep(
+        const Sentence<int> & src_sent,
+        const Sentence<int> & trg_sent,
+        const Tensor2<double> & translation_prob,
+        const Tensor2<double> & jumping_prob,
+        const Tensor1<double> & null_jumping_prob,
+        const int src_null_id,
+        const HmmJumpingRange & range);
 
     static Tensor3<double> getEdgeProbability(
         const Sentence<int> & src_sent,

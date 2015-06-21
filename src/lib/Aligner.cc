@@ -445,7 +445,6 @@ vector<Alignment> Aligner::generateHmmViterbiAlignment(
     MYASSERT(TreeAligner::Aligner::generateIbmModel1ViterbiAlignment, src_null_id < src_num_vocab);
     
     const int src_len = src_sent.size();
-    const int trg_len = trg_sent.size();
 
     // aliases
     const auto & pt = model.generation_prob;
@@ -455,110 +454,18 @@ vector<Alignment> Aligner::generateHmmViterbiAlignment(
     const auto range = Hmm::getLimitedJumpingRange(src_len, model.distance_limit);
 
     // calculate jumping prob.
-    // pj[is][is'] = Pj(is' -> is) = Fj(is - is') / sum[ Fj(j - is') for j = [0, src_len) ]
     Tensor2<double> pj;
     Tensor1<double> pj_null;
     tie(pj, pj_null) = Hmm::getJumpingProbability(fj, fj_null, src_len, range);
 
-    // scaling factor
-    // scale[it]
-    auto scale = make_tensor1<double>(trg_len);
-
-    // scaled Viterbi score
-    // viterbi[it][is]
-    auto viterbi = make_tensor2<double>(trg_len, 2 * src_len, -1.0);
-    
-    // previous position
-    // prev[it][is]
-    auto prev = make_tensor2<int>(trg_len, 2 * src_len);
-
     // forward step
-    {
-        // initial
-        double sum = 0.0;
-        const double initial_prob = 1.0 / (2.0 * src_len);
-        for (int is : irange(0, src_len)) {
-            {
-                const double delta = initial_prob * pt[trg_sent[0]][src_sent[is]];
-                viterbi[0][is] = delta;
-                sum += delta;
-            }
-            {
-                const double delta = initial_prob * pt[trg_sent[0]][src_null_id];
-                viterbi[0][is + src_len] = delta;
-                sum += delta;
-            }
-        }
-        const double scale_0 = 1.0 / sum;
-        scale[0] = scale_0;
-        for (int is : irange(0, src_len)) {
-            viterbi[0][is] *= scale_0;
-            viterbi[0][is + src_len] *= scale_0;
-        }
-    }
-    for (int it : irange(1, trg_len)) {
-        // remaining
-        double sum = 0.0;
-        for (int is : irange(0, src_len)) {
-            {
-                double pt_it_is = pt[trg_sent[it]][src_sent[is]];
-                for (int is2 : irange(range.min[is], range.max[is])) {
-                    const double pj_and_pt = pj[is][is2] * pt_it_is;
-                    {
-                        const double score = viterbi[it - 1][is2] * pj_and_pt;
-                        if (score > viterbi[it][is]) {
-                            viterbi[it][is] = score;
-                            prev[it][is] = is2;
-                        }
-                    }
-                    {
-                        const double score = viterbi[it - 1][is2 + src_len] * pj_and_pt;
-                        if (score > viterbi[it][is]) {
-                            viterbi[it][is] = score;
-                            prev[it][is] = is2 + src_len;
-                        }
-                    }
-                }
-                sum += viterbi[it][is];
-            }
-            {
-                const double pj_and_pt = pj_null[is] * pt[trg_sent[it]][src_null_id];
-                if (viterbi[it - 1][is] > viterbi[it - 1][is + src_len]) {
-                    viterbi[it][is + src_len] = viterbi[it - 1][is] * pj_and_pt;
-                    prev[it][is + src_len] = is;
-                } else {
-                    viterbi[it][is + src_len] = viterbi[it - 1][is + src_len] * pj_and_pt;
-                    prev[it][is + src_len] = is + src_len;
-                }
-                sum += viterbi[it][is + src_len];
-            }
-        }
-        const double scale_it = 1.0 / sum;
-        scale[it] = scale_it;
-        for (int is : irange(0, src_len)) {
-            viterbi[it][is] *= scale_it;
-            viterbi[it][is + src_len] *= scale_it;
-        }
-    }
-    
+    Tensor2<double> viterbi;
+    Tensor1<double> scale;
+    Tensor2<int> prev;
+    tie(viterbi, scale, prev) = Hmm::viterbiForwardStep(src_sent, trg_sent, pt, pj, pj_null, src_null_id, range);
+
     // backward step
-    vector<Alignment> align;
-    double max_score = -1.0;
-    int pos = -1;
-    for (int is : irange(0, src_len)) {
-        if (viterbi[trg_len - 1][is] > max_score) {
-            max_score = viterbi[trg_len - 1][is];
-            pos = is;
-        }
-    }
-    for (int it : irange(0, trg_len) | reversed) {
-        if (pos < src_len) {
-            align.push_back(Alignment { pos, it });
-        }
-        pos = prev[it][pos];
-    }
-    
-    return align;
+    return getHmmViterbiAlignment(viterbi, prev);
 }
 
 TreeTraversalProbability Aligner::calculateTreeTraversalProbability(
@@ -862,6 +769,34 @@ tuple<Tensor2<double>, Tensor1<double>> Aligner::calculateTreeHmmJumpingProbabil
     */
 
     return make_tuple(std::move(pj), std::move(pj_null));
+}
+
+vector<Alignment> Aligner::getHmmViterbiAlignment(
+    const Tensor2<double> & viterbi_prob,
+    const Tensor2<int> & previous_position) {
+
+    const int src_len = viterbi_prob[0].size() / 2;
+    const int trg_len = viterbi_prob.size();
+
+    vector<Alignment> align;
+    double max_score = -1.0;
+    int pos = -1;
+    
+    for (int is : irange(0, 2 * src_len)) {
+        if (viterbi_prob[trg_len - 1][is] > max_score) {
+            max_score = viterbi_prob[trg_len - 1][is];
+            pos = is;
+        }
+    }
+
+    for (int it : irange(0, trg_len) | reversed) {
+        if (pos < src_len) {
+            align.push_back(Alignment { pos, it });
+        }
+        pos = previous_position[it][pos];
+    }
+
+    return align;
 }
 
 } // namespace TreeAligner

@@ -143,6 +143,10 @@ private:
         const TreeTraversalProbability & traversal_prob,
         const Tensor2<std::vector<TreeHmmPath>> & paths);
 
+    static std::vector<Alignment> getHmmViterbiAlignment(
+        const Tensor2<double> & viterbi_prob,
+        const Tensor2<int> & previous_position);
+
 }; // class Aligner
 
 } // namespace TreeAligner

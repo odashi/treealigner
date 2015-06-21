@@ -185,6 +185,99 @@ Tensor2<double> Hmm::backwardStep(
     return b;
 }
 
+tuple<Tensor2<double>, Tensor1<double>, Tensor2<int>> Hmm::viterbiForwardStep(
+    const Sentence<int> & src_sent,
+    const Sentence<int> & trg_sent,
+    const Tensor2<double> & translation_prob,
+    const Tensor2<double> & jumping_prob,
+    const Tensor1<double> & null_jumping_prob,
+    const int src_null_id,
+    const HmmJumpingRange & range) {
+
+    const int src_len = src_sent.size();
+    const int trg_len = trg_sent.size();
+
+    // aliases
+    const auto & pt = translation_prob;
+    const auto & pj = jumping_prob;
+    const auto & pj_null = null_jumping_prob;
+
+    auto viterbi = make_tensor2<double>(trg_len, 2 * src_len);
+    auto scale = make_tensor1<double>(trg_len);
+    auto prev = make_tensor2<int>(trg_len, 2 * src_len);
+
+    {
+        // initial
+        double sum = 0.0;
+        const double initial_prob = 1.0 / (2.0 * src_len);
+        for (int is : irange(0, src_len)) {
+            {
+                const double delta = initial_prob * pt[trg_sent[0]][src_sent[is]];
+                viterbi[0][is] = delta;
+                sum += delta;
+            }
+            {
+                const double delta = initial_prob * pt[trg_sent[0]][src_null_id];
+                viterbi[0][is + src_len] = delta;
+                sum += delta;
+            }
+        }
+        const double scale_0 = 1.0 / sum;
+        scale[0] = scale_0;
+        for (int is : irange(0, src_len)) {
+            viterbi[0][is] *= scale_0;
+            viterbi[0][is + src_len] *= scale_0;
+        }
+    }
+    for (int it : irange(1, trg_len)) {
+        // remaining
+        double sum = 0.0;
+        for (int is : irange(0, src_len)) {
+            {
+                double pt_it_is = pt[trg_sent[it]][src_sent[is]];
+                for (int is2 : irange(range.min[is], range.max[is])) {
+                    const double pj_and_pt = pj[is][is2] * pt_it_is;
+                    {
+                        const double score = viterbi[it - 1][is2] * pj_and_pt;
+                        if (score > viterbi[it][is]) {
+                            viterbi[it][is] = score;
+                            prev[it][is] = is2;
+                        }
+                    }
+                    {
+                        const double score = viterbi[it - 1][is2 + src_len] * pj_and_pt;
+                        if (score > viterbi[it][is]) {
+                            viterbi[it][is] = score;
+                            prev[it][is] = is2 + src_len;
+                        }
+                    }
+                }
+                sum += viterbi[it][is];
+            }
+            {
+                const double pj_and_pt = pj_null[is] * pt[trg_sent[it]][src_null_id];
+                if (viterbi[it - 1][is] > viterbi[it - 1][is + src_len]) {
+                    viterbi[it][is + src_len] = viterbi[it - 1][is] * pj_and_pt;
+                    prev[it][is + src_len] = is;
+                } else {
+                    viterbi[it][is + src_len] = viterbi[it - 1][is + src_len] * pj_and_pt;
+                    prev[it][is + src_len] = is + src_len;
+                }
+                sum += viterbi[it][is + src_len];
+            }
+        }
+        const double scale_it = 1.0 / sum;
+        scale[it] = scale_it;
+        for (int is : irange(0, src_len)) {
+            viterbi[it][is] *= scale_it;
+            viterbi[it][is + src_len] *= scale_it;
+        }
+    }
+
+    return make_tuple(std::move(viterbi), std::move(scale), std::move(prev));
+}
+
+
 Tensor3<double> Hmm::getEdgeProbability(
     const Sentence<int> & src_sent,
     const Sentence<int> & trg_sent,
