@@ -5,7 +5,7 @@ AHC TreeAligner
 Install
 -------
 
-You need following tools to build Ckylark.
+You need following tools to build TreeAligner.
 * `GCC 4.7` or later
 * `Boost 1.49` or later
 * `autotools`
