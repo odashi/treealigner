@@ -12,7 +12,7 @@ You need following tools to build Ckylark.
 
 You simply run below:
 
-    cd /path/to/Ckylark
+    cd /path/to/treealigner
     autoreconf -i
     ./configure
     make
