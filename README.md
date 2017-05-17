@@ -1,4 +1,4 @@
-AHC TreeAligner
+TreeAligner
 ===========
 
 
